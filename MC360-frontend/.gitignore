@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Vite
+*.local
+vite.config.js.timestamp-*
+
+# Editor & OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.suo
+*.sw?
+
+# Cache
+.eslintcache
+.cache/
+
+# Testing
+coverage/
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Empty asset folders (use .gitkeep instead)
+src/assets/images/*
+src/assets/icons/*
+!src/assets/images/.gitkeep
+!src/assets/icons/.gitkeep
