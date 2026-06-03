@@ -1,0 +1,54 @@
+# ==========================================
+# MedConnect360 Backend .gitignore
+# ==========================================
+
+# Dependency directories
+node_modules/
+jspm_packages/
+web_stage/
+
+# Environment variables & secrets (CRITICAL)
+.env
+.env.local
+.env.production
+.env.development
+*.env
+*.pem
+*.key
+firebase-key.json
+
+# Local development files & temporary storage
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.eslintcache
+
+# Project temporary upload directories (Multer/Cloudinary storage fallbacks)
+src/uploads/
+dist/
+build/
+
+# IDE / Editor specific configurations
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Python ML Microservice specific (ml-models/)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+.venv/
+.pytest_cache/
+.ipynb_checkpoints/
