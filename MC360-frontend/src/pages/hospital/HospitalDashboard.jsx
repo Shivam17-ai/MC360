@@ -1,12 +1,3 @@
-export default function HospitalDashboard() {
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-display font-bold text-slate-800">HospitalDashboard</h1>
-      <p className="text-slate-500 mt-1">Coming soon.</p>
-    </div>
-  )
-}
-
 import { useState, useEffect } from "react";
 import {
   Users,
@@ -166,5 +157,4 @@ const HospitalDashboard = () => {
     </div>
   );
 };
-
 export default HospitalDashboard;

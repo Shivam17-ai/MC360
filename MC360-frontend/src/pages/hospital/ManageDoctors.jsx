@@ -1,11 +1,4 @@
-export default function ManageDoctors() {
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-display font-bold text-slate-800">ManageDoctors</h1>
-      <p className="text-slate-500 mt-1">Coming soon.</p>
-    </div>
-  )
-}
+
 import { useState, useEffect } from "react";
 import { Plus, Search, Edit2, Trash2, UserCheck, UserX, Phone, Mail } from "lucide-react";
 import api from "../../services/api";
