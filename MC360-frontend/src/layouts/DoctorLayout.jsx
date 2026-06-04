@@ -1,11 +1,20 @@
-import { Outlet } from 'react-router-dom'
+import { useNavigate } from "react-router-dom";
+import DashboardLayout from "../components/layout/DashboardLayout";
 
-export default function DoctorLayout() {
+const DoctorLayout = ({ children, user }) => {
+  const navigate = useNavigate();
+
+  const doctorUser = user || {
+    name: "Doctor User",
+    role: "doctor",
+    email: "doctor@example.com",
+  };
+
   return (
-    <div className="min-h-screen flex bg-surface-muted">
-      <main className="flex-1 overflow-auto">
-        <Outlet />
-      </main>
-    </div>
-  )
-}
+    <DashboardLayout role="doctor" user={doctorUser}>
+      {children}
+    </DashboardLayout>
+  );
+};
+
+export default DoctorLayout;
