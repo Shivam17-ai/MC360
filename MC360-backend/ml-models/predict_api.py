@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 import pandas as pd
 import joblib
-import pickle  # Added to unpack the metadata payload from the obesity model
+import pickle  # Used to unpack the metadata payload from the obesity model
 
 app = Flask(__name__)
 
@@ -37,6 +37,29 @@ OBESITY_FEATURES = obesity_payload["features"]
 # Loading the custom numerical scaler
 with open("models/obesity_scaler.pkl", "rb") as f:
     obesity_scaler = pickle.load(f)
+
+# ==========================================
+# DIAGNOSIS 3: HEART DISEASE ARTIFACTS
+# ==========================================
+heart_model = joblib.load("models/heart_model.pkl")
+heart_scaler = joblib.load("models/heart_scaler.pkl")
+
+# NOTE: Update these strings to match the exact column names of your heart dataset
+HEART_FEATURES = [
+    "age",
+    "sex",
+    "cp",          # Chest pain type
+    "trestbps",    # Resting blood pressure
+    "chol",        # Serum cholesterol
+    "fbs",         # Fasting blood sugar
+    "restecg",     # Resting electrocardiographic results
+    "thalach",     # Maximum heart rate achieved
+    "exang",       # Exercise induced angina
+    "oldpeak",     # ST depression induced by exercise
+    "slope",       # The slope of the peak exercise ST segment
+    "ca",          # Number of major vessels
+    "thal"         # Thalassemia type
+]
 
 
 # ==========================================
@@ -94,6 +117,30 @@ def predict_obesity():
     })
 
 
+# ==========================================
+# ENDPOINT 3: HEART DISEASE PREDICTION
+# ==========================================
+@app.route("/predict/heart", methods=["POST"])
+def predict_heart():
+    data = request.json
+    df = pd.DataFrame([data])
+    
+    # Force identical feature ordering used during model training
+    df = df[HEART_FEATURES]
+    
+    # Standardize data structure using the heart scaler
+    scaled = heart_scaler.transform(df)
+    
+    # Generate binary prediction and probability
+    prediction = heart_model.predict(scaled)[0]
+    probability = heart_model.predict_proba(scaled)[0][1]
+
+    return jsonify({
+        "prediction": int(prediction),
+        "risk_score": round(float(probability * 100), 2)
+    })
+
+
 if __name__ == "__main__":
-    # Make sure both models are inside a directory named 'models' relative to this script
+    # Ensure all models are placed inside a directory named 'models' relative to this script
     app.run(port=5001, debug=True)
