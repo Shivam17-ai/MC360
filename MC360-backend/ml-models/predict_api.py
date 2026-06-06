@@ -1,9 +1,13 @@
 from flask import Flask, request, jsonify
 import pandas as pd
 import joblib
+import pickle  # Added to unpack the metadata payload from the obesity model
 
 app = Flask(__name__)
 
+# ==========================================
+# DIAGNOSIS 1: DIABETES ARTIFACTS
+# ==========================================
 model = joblib.load("models/diabetes_model.pkl")
 scaler = joblib.load("models/diabetes_scaler.pkl")
 
@@ -18,19 +22,34 @@ FEATURES = [
     "Age"
 ]
 
+# ==========================================
+# DIAGNOSIS 2: OBESITY ARTIFACTS
+# ==========================================
+# Unpacking the comprehensive model payload we generated
+with open("models/obesity_model.pkl", "rb") as f:
+    obesity_payload = pickle.load(f)
+
+obesity_model = obesity_payload["model"]
+obesity_target_encoder = obesity_payload["target_encoder"]
+obesity_label_encoders = obesity_payload["label_encoders"]
+OBESITY_FEATURES = obesity_payload["features"]
+
+# Loading the custom numerical scaler
+with open("models/obesity_scaler.pkl", "rb") as f:
+    obesity_scaler = pickle.load(f)
+
+
+# ==========================================
+# ENDPOINT 1: DIABETES PREDICTION
+# ==========================================
 @app.route("/predict/diabetes", methods=["POST"])
 def predict_diabetes():
-
     data = request.json
-
     df = pd.DataFrame([data])
-
     df = df[FEATURES]
-
+    
     scaled = scaler.transform(df)
-
     prediction = model.predict(scaled)[0]
-
     probability = model.predict_proba(scaled)[0][1]
 
     return jsonify({
@@ -38,5 +57,43 @@ def predict_diabetes():
         "risk_score": round(float(probability * 100), 2)
     })
 
+
+# ==========================================
+# ENDPOINT 2: OBESITY PREDICTION
+# ==========================================
+@app.route("/predict/obesity", methods=["POST"])
+def predict_obesity():
+    data = request.json
+    df = pd.DataFrame([data])
+    
+    # Force identical feature ordering used during model training
+    df = df[OBESITY_FEATURES]
+    
+    # 1. Transform incoming text categories into model-ready integers
+    for col, encoder in obesity_label_encoders.items():
+        if col in df.columns:
+            df[col] = encoder.transform(df[col].astype(str))
+            
+    # 2. Isolate and scale only the numerical features
+    numerical_cols = [col for col in OBESITY_FEATURES if col not in obesity_label_encoders]
+    df[numerical_cols] = obesity_scaler.transform(df[numerical_cols])
+    
+    # 3. Generate multiclass prediction
+    prediction_numeric = obesity_model.predict(df)[0]
+    probabilities = obesity_model.predict_proba(df)[0]
+    
+    # Convert numerical class back to string (e.g., 'Overweight_Level_I' or 'Obesity_Type_III')
+    prediction_label = obesity_target_encoder.inverse_transform([prediction_numeric])[0]
+    
+    # Extract the confidence score for the chosen prediction class
+    confidence_score = max(probabilities)
+
+    return jsonify({
+        "prediction": str(prediction_label),
+        "risk_score": round(float(confidence_score * 100), 2)
+    })
+
+
 if __name__ == "__main__":
+    # Make sure both models are inside a directory named 'models' relative to this script
     app.run(port=5001, debug=True)
