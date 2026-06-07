@@ -1,8 +1,25 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose'
 
-const SymptomLogSchema = new mongoose.Schema({
-  patient: { type: mongoose.Schema.Types.ObjectId, ref: 'Patient' },
-  symptoms: Array,
-}, { timestamps: true });
+const symptomLogSchema = new mongoose.Schema({
+  patient: {
+    type:     mongoose.Schema.Types.ObjectId,
+    ref:      'User',
+    required: true,
+  },
 
-module.exports = mongoose.model('SymptomLog', SymptomLogSchema);
+  symptoms: [{ type: String }],
+
+  analysis: {
+    possibleConditions:   [String],
+    severity:             mongoose.Schema.Types.Mixed,
+    recommendedSpecialist: String,
+    action:               String,
+    redFlags:             [String],
+    disclaimer:           String,
+  },
+
+  notes:     { type: String },
+  loggedAt:  { type: Date, default: Date.now },
+}, { timestamps: true })
+
+export default mongoose.model('SymptomLog', symptomLogSchema)
