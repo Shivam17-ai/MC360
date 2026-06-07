@@ -1,7 +1,22 @@
-const express = require('express');
+import express from "express";
+import {
+  bookTest,
+  getTests,
+  getTestById,
+  cancelTest,
+  updateTestStatus,
+} from "../controllers/test.controller.js";
+import { protect } from "../middlewares/auth.middleware.js";
+import { authorizeRoles } from "../middlewares/role.middleware.js";
+
 const router = express.Router();
-const controller = require('../controllers/test.controller');
 
-router.get('/', controller.getTests);
+router.use(protect);
 
-module.exports = router;
+router.get("/",         getTests);
+router.post("/",        authorizeRoles("patient"), bookTest);
+router.get("/:id",      getTestById);
+router.delete("/:id",   authorizeRoles("patient"), cancelTest);
+router.put("/:id/status", authorizeRoles("doctor", "hospital_admin"), updateTestStatus);
+
+export default router;

@@ -1,7 +1,23 @@
-const express = require('express');
+import express from "express";
+import {
+  getHealthMetrics,
+  addHealthMetric,
+  getMetricsByType,
+  deleteHealthMetric,
+  getLatestMetrics,
+} from "../controllers/healthMetric.controller.js";
+import { protect } from "../middlewares/auth.middleware.js";
+import { authorizeRoles } from "../middlewares/role.middleware.js";
+
 const router = express.Router();
-const controller = require('../controllers/healthMetric.controller');
 
-router.get('/', controller.getHealthMetrics);
+router.use(protect);
+router.use(authorizeRoles("patient", "doctor"));
 
-module.exports = router;
+router.get("/",         getHealthMetrics);
+router.post("/",        addHealthMetric);
+router.get("/latest",   getLatestMetrics);
+router.get("/:type",    getMetricsByType);
+router.delete("/:id",   deleteHealthMetric);
+
+export default router;
