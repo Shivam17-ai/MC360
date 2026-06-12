@@ -1,56 +1,83 @@
-import http from "http";
-import app from "./app.js";
-import connectDB from "./config/db.js";
-import env from "./config/env.js";
-import { initSocket } from "./sockets/index.js";
+require("dotenv").config();
 
-const PORT = env.PORT || 5000;
+const http = require("http");
+const { Server } = require("socket.io");
 
-// ── Create HTTP server ────────────────────────────────────────────────────
+const app = require("./app");
+const connectDB = require("./config/db");
+const { initFirebase } = require("./config/firebase");
+const { initCloudinary } = require("./config/cloudinary");
+const { initTwilio } = require("./config/twilio");
+const { initSockets } = require("./sockets");
+const logger = require("./utils/logger");
+const env = require("./config/env");
+
+// Background jobs
+const medicineReminderJob = require("./jobs/medicineReminder.job");
+const appointmentReminderJob = require("./jobs/appointmentReminder.job");
+const healthAlertJob = require("./jobs/healthAlert.job");
+
 const server = http.createServer(app);
 
-// ── Init Socket.IO ────────────────────────────────────────────────────────
-initSocket(server);
+// ── Socket.IO ─────────────────────────────────────────────────────────────────
+const io = new Server(server, {
+  cors: {
+    origin: [env.CLIENT_URL, "http://localhost:5173", "http://localhost:3000"],
+    credentials: true,
+    methods: ["GET", "POST"],
+  },
+  pingTimeout: 60000,
+  pingInterval: 25000,
+});
 
-// ── Connect DB then start server ──────────────────────────────────────────
 const startServer = async () => {
   try {
+    // Connect database
     await connectDB();
 
-    server.listen(PORT, () => {
-      console.log("─────────────────────────────────────────");
-      console.log(`🚀 MC360 Server running on port ${PORT}`);
-      console.log(`📦 Environment : ${env.NODE_ENV}`);
-      console.log(`🌐 Frontend URL: ${env.FRONTEND_URL}`);
-      console.log(`🤖 ML Service  : ${env.ML_SERVICE_URL}`);
-      console.log("─────────────────────────────────────────");
-    });
+    // Init third-party services (gracefully — they warn if keys missing)
+    initFirebase();
+    initCloudinary();
+    initTwilio();
 
-  } catch (error) {
-    console.error("❌ Server failed to start:", error.message);
+    // Init Socket.IO
+    initSockets(io);
+
+    // Start cron jobs
+    medicineReminderJob.start();
+    appointmentReminderJob.start();
+    healthAlertJob.start();
+    logger.info("Background jobs started.");
+
+    // Start server
+    server.listen(env.PORT, () => {
+      logger.info(`🚀 MC360 Server running on port ${env.PORT} in ${env.NODE_ENV} mode`);
+      logger.info(`📡 API: http://localhost:${env.PORT}/api/v1`);
+      logger.info(`❤️  Health: http://localhost:${env.PORT}/health`);
+    });
+  } catch (err) {
+    logger.error(`Failed to start server: ${err.message}`);
     process.exit(1);
   }
 };
 
-// ── Unhandled rejections ──────────────────────────────────────────────────
-process.on("unhandledRejection", (err) => {
-  console.error("❌ Unhandled Rejection:", err.message);
-  server.close(() => process.exit(1));
-});
-
-// ── Uncaught exceptions ───────────────────────────────────────────────────
-process.on("uncaughtException", (err) => {
-  console.error("❌ Uncaught Exception:", err.message);
-  process.exit(1);
-});
-
-// ── Graceful shutdown ─────────────────────────────────────────────────────
-process.on("SIGTERM", () => {
-  console.log("🛑 SIGTERM received. Shutting down gracefully...");
+// Graceful shutdown
+const shutdown = (signal) => {
+  logger.info(`${signal} received. Shutting down...`);
   server.close(() => {
-    console.log("✅ Server closed");
-    process.exit(0);
+    logger.info("HTTP server closed.");
+    require("mongoose").connection.close(false, () => {
+      logger.info("MongoDB connection closed.");
+      process.exit(0);
+    });
   });
+};
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("unhandledRejection", (err) => {
+  logger.error(`Unhandled Rejection: ${err.message}`);
+  shutdown("unhandledRejection");
 });
 
 startServer();

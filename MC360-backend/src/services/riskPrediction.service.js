@@ -1,55 +1,49 @@
-import RiskPrediction from "../models/RiskPrediction.model.js";
-import { predictDisease, SUPPORTED_DISEASES } from "./ai.service.js";
+const RiskPrediction = require("../models/RiskPrediction.model");
+const { predict, getRiskLevel, getDefaultRecommendations } = require("../ai/riskPredictor");
+const logger = require("../utils/logger");
 
 /**
- * Run prediction and save to DB
+ * riskPrediction.service.js
+ *
+ * Calls riskPredictor.js (which calls your predict_api.py),
+ * then saves the result to MongoDB.
+ *
+ * predict_api.py response shapes:
+ *   Diabetes : { prediction: 0|1,      risk_score: 0-100 }
+ *   Heart    : { prediction: 0|1,      risk_score: 0-100 }
+ *   Obesity  : { prediction: "label",  risk_score: 0-100 }
  */
-export const runRiskPrediction = async (patientId, disease, inputParams) => {
-  if (!SUPPORTED_DISEASES.includes(disease)) {
-    throw new Error(`Disease must be one of: ${SUPPORTED_DISEASES.join(", ")}`);
-  }
 
-  // Call Flask ML
-  const result = await predictDisease(disease, inputParams);
+const predictRisk = async (patientId, modelType, inputData) => {
+  // calls predict_api.py and normalises the response
+  const result = await predict(modelType, inputData);
 
-  // Save to DB
   const prediction = await RiskPrediction.create({
-    patientId,
-    predictionType: disease,
-    inputParams,
-    riskPercentage: result.riskPercentage,
-    riskCategory: result.riskCategory,
-    recommendations: result.recommendations,
-    modelAccuracy: result.modelAccuracy || null,
+    patient:      patientId,
+    modelType,
+    inputData,
+    result: {
+      riskScore:       result.riskScore,
+      riskLevel:       result.riskLevel,
+      probability:     result.probability,
+      recommendations: result.recommendations,
+      factors:         result.factors || [],
+      // store the raw label for obesity ("Obesity_Type_II") or "Positive"/"Negative" for others
+      predictionLabel: result.predictionLabel,
+    },
+    modelVersion: result.modelVersion,
   });
 
-  return { prediction, mlResult: result };
+  return prediction;
 };
 
-/**
- * Get all predictions for a patient
- */
-export const getPatientPredictions = async (patientId, disease = null) => {
-  const query = { patientId };
-  if (disease) query.predictionType = disease;
+const getPatientRiskHistory = async (patientId, modelType = null, limit = 10) => {
+  const filter = { patient: patientId };
+  if (modelType) filter.modelType = modelType;
 
-  return await RiskPrediction.find(query).sort({ createdAt: -1 });
+  return RiskPrediction.find(filter)
+    .sort({ predictedAt: -1 })
+    .limit(limit);
 };
 
-/**
- * Get latest prediction per disease for a patient
- */
-export const getLatestPredictions = async (patientId) => {
-  const predictions = {};
-
-  for (const disease of SUPPORTED_DISEASES) {
-    const latest = await RiskPrediction.findOne({
-      patientId,
-      predictionType: disease,
-    }).sort({ createdAt: -1 });
-
-    if (latest) predictions[disease] = latest;
-  }
-
-  return predictions;
-};
+module.exports = { predictRisk, getPatientRiskHistory };

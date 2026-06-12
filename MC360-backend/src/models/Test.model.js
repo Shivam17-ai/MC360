@@ -1,40 +1,50 @@
-import mongoose from 'mongoose'
+const mongoose = require("mongoose");
 
-const testItemSchema = new mongoose.Schema({
-  name:     { type: String, required: true },
-  category: { type: String },
-  price:    { type: Number, default: 0 },
-}, { _id: false })
-
-const testSchema = new mongoose.Schema({
-  patient: {
-    type:     mongoose.Schema.Types.ObjectId,
-    ref:      'User',
-    required: true,
+const testSchema = new mongoose.Schema(
+  {
+    testId: { type: String, unique: true },
+    patient: { type: mongoose.Schema.Types.ObjectId, ref: "Patient", required: true },
+    hospital: { type: mongoose.Schema.Types.ObjectId, ref: "Hospital" },
+    orderedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Doctor" },
+    testName: { type: String, required: true },
+    testCode: { type: String },
+    category: {
+      type: String,
+      enum: ["blood", "urine", "imaging", "biopsy", "microbiology", "cardiology", "other"],
+      default: "other",
+    },
+    status: {
+      type: String,
+      enum: ["ordered", "sample-collected", "processing", "completed", "cancelled"],
+      default: "ordered",
+    },
+    scheduledDate: { type: Date },
+    completedDate: { type: Date },
+    results: [
+      {
+        parameter: String,
+        value: String,
+        unit: String,
+        normalRange: String,
+        isAbnormal: { type: Boolean, default: false },
+      },
+    ],
+    report: { type: mongoose.Schema.Types.ObjectId, ref: "Report" },
+    fee: { type: Number, default: 0 },
+    isPaid: { type: Boolean, default: false },
+    notes: String,
+    sampleCollected: { type: Boolean, default: false },
+    sampleCollectedAt: Date,
   },
+  { timestamps: true }
+);
 
-  tests:          [testItemSchema],
-  totalAmount:    { type: Number, default: 0 },
+testSchema.pre("save", async function (next) {
+  if (!this.testId) {
+    const count = await mongoose.model("Test").countDocuments();
+    this.testId = `MC360-T-${String(count + 1).padStart(6, "0")}`;
+  }
+  next();
+});
 
-  collectionType: { type: String, enum: ['home', 'lab'], default: 'lab' },
-  collectionDate: { type: String },
-  collectionTime: { type: String },
-
-  address: {
-    street:  String,
-    city:    String,
-    pincode: String,
-  },
-
-  status: {
-    type:    String,
-    enum:    ['booked', 'sample_collected', 'processing', 'completed', 'cancelled'],
-    default: 'booked',
-  },
-
-  reportUrl:  { type: String },
-  isPaid:     { type: Boolean, default: false },
-  notes:      { type: String },
-}, { timestamps: true })
-
-export default mongoose.model('Test', testSchema)
+module.exports = mongoose.model("Test", testSchema);

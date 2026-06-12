@@ -1,11 +1,8 @@
-/**
- * auth.middleware.js
- * Verifies JWT token and attaches req.user
- * Works with Zustand authStore which sends: Authorization: Bearer <token>
- */
-
-const jwt  = require("jsonwebtoken");
-const User = require("../models/user.model");
+const { verifyAccessToken } = require("../utils/generateToken");
+const { getAdmin } = require("../config/firebase");
+const User = require("../models/User.model");
+const { errorResponse } = require("../utils/response");
+const logger = require("../utils/logger");
 
 const protect = async (req, res, next) => {
   try {
@@ -16,62 +13,60 @@ const protect = async (req, res, next) => {
       req.headers.authorization.startsWith("Bearer ")
     ) {
       token = req.headers.authorization.split(" ")[1];
+    } else if (req.cookies?.accessToken) {
+      token = req.cookies.accessToken;
     }
 
     if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: "Access denied. No token provided.",
-      });
+      return errorResponse(res, "Access denied. No token provided.", 401);
     }
 
-    // Verify
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // Try JWT first
+    try {
+      const decoded = verifyAccessToken(token);
+      const user = await User.findById(decoded.id).select("-password -refreshToken");
 
-    // Attach full user (exclude password)
-    const user = await User.findById(decoded.id).select("-password");
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "User no longer exists.",
-      });
+      if (!user) return errorResponse(res, "User not found.", 401);
+      if (!user.isActive) return errorResponse(res, "Account deactivated.", 403);
+
+      req.user = user;
+      return next();
+    } catch (jwtError) {
+      // If JWT fails, try Firebase token
+      try {
+        const admin = getAdmin();
+        if (!admin) throw new Error("Firebase not configured");
+
+        const decoded = await admin.auth().verifyIdToken(token);
+        const user = await User.findOne({ firebaseUid: decoded.uid }).select("-password -refreshToken");
+
+        if (!user) return errorResponse(res, "User not found. Please register.", 401);
+        if (!user.isActive) return errorResponse(res, "Account deactivated.", 403);
+
+        req.user = user;
+        return next();
+      } catch (firebaseError) {
+        logger.debug(`Auth failed - JWT: ${jwtError.message} | Firebase: ${firebaseError.message}`);
+        return errorResponse(res, "Invalid or expired token.", 401);
+      }
     }
-
-    if (user.isActive === false) {
-      return res.status(403).json({
-        success: false,
-        message: "Account has been deactivated. Contact admin.",
-      });
-    }
-
-    req.user = user;
-    next();
   } catch (err) {
-    if (err.name === "TokenExpiredError") {
-      return res.status(401).json({ success: false, message: "Token expired. Please login again." });
-    }
-    if (err.name === "JsonWebTokenError") {
-      return res.status(401).json({ success: false, message: "Invalid token." });
-    }
-    return res.status(500).json({ success: false, message: "Authentication error." });
+    logger.error(`Auth middleware error: ${err.message}`);
+    return errorResponse(res, "Authentication error.", 500);
   }
 };
 
-/**
- * Optional auth — attaches user if token present, but doesn't block
- * Useful for public routes that show extra info when logged in
- */
+// Optional auth — doesn't fail if no token
 const optionalAuth = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      const token   = authHeader.split(" ")[1];
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user    = await User.findById(decoded.id).select("-password");
-      if (user) req.user = user;
-    }
-  } catch (_) {
-    // silently ignore — optional auth
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return next();
+
+    const decoded = verifyAccessToken(token);
+    const user = await User.findById(decoded.id).select("-password");
+    if (user) req.user = user;
+  } catch {
+    // silently continue
   }
   next();
 };

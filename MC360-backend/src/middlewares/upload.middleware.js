@@ -1,124 +1,64 @@
-/**
- * upload.middleware.js
- * Multer configuration for file uploads
- * Supports: reports (PDF/images), avatars (images), OCR scans
- * Install: npm install multer
- */
+const multer = require("multer");
+const path = require("path");
+const { cloudinary } = require("../config/cloudinary");
+const { errorResponse } = require("../utils/response");
 
-const multer  = require("multer");
-const path    = require("path");
-const fs      = require("fs");
+// Memory storage — files are uploaded to Cloudinary from buffer
+const storage = multer.memoryStorage();
 
-// ── Ensure upload directories exist ──────────────────────────
-const UPLOAD_DIRS = {
-  reports : "uploads/reports",
-  avatars : "uploads/avatars",
-  ocr     : "uploads/ocr",
-  general : "uploads/general",
+const fileFilter = (allowedTypes) => (req, file, cb) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (allowedTypes.includes(ext)) {
+    cb(null, true);
+  } else {
+    cb(new Error(`Invalid file type. Allowed: ${allowedTypes.join(", ")}`), false);
+  }
 };
 
-Object.values(UPLOAD_DIRS).forEach((dir) => {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: fileFilter([".jpg", ".jpeg", ".png", ".pdf", ".webp"]),
 });
 
-// ── Storage factory ───────────────────────────────────────────
-const makeStorage = (folder) =>
-  multer.diskStorage({
-    destination: (req, file, cb) => {
-      cb(null, UPLOAD_DIRS[folder] || UPLOAD_DIRS.general);
-    },
-    filename: (req, file, cb) => {
-      const ext      = path.extname(file.originalname);
-      const baseName = path.basename(file.originalname, ext).replace(/\s+/g, "-");
-      const unique   = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
-      cb(null, `${baseName}-${unique}${ext}`);
-    },
+const uploadImage = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: fileFilter([".jpg", ".jpeg", ".png", ".webp"]),
+});
+
+// Helper: upload buffer to Cloudinary
+const uploadToCloudinary = (buffer, folder, resourceType = "auto") => {
+  return new Promise((resolve, reject) => {
+    cloudinary.uploader
+      .upload_stream({ folder, resource_type: resourceType }, (error, result) => {
+        if (error) reject(error);
+        else resolve(result);
+      })
+      .end(buffer);
   });
-
-// ── File filter factories ─────────────────────────────────────
-const imageFilter = (req, file, cb) => {
-  const allowed = /jpeg|jpg|png|webp/;
-  const ext     = allowed.test(path.extname(file.originalname).toLowerCase());
-  const mime    = allowed.test(file.mimetype);
-  if (ext && mime) return cb(null, true);
-  cb(new Error("Only image files (jpeg, jpg, png, webp) are allowed."));
 };
 
-const reportFilter = (req, file, cb) => {
-  const allowed = /pdf|jpeg|jpg|png/;
-  const ext     = allowed.test(path.extname(file.originalname).toLowerCase());
-  if (ext) return cb(null, true);
-  cb(new Error("Only PDF and image files are allowed for reports."));
+const deleteFromCloudinary = async (publicId, resourceType = "image") => {
+  return cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
 };
 
-const anyFileFilter = (req, file, cb) => cb(null, true);
-
-// ── Named uploaders ───────────────────────────────────────────
-
-/** Report upload: PDF or image, max 10MB */
-const uploadReport = multer({
-  storage   : makeStorage("reports"),
-  fileFilter: reportFilter,
-  limits    : { fileSize: 10 * 1024 * 1024 },
-}).single("report");
-
-/** Avatar upload: image only, max 2MB */
-const uploadAvatar = multer({
-  storage   : makeStorage("avatars"),
-  fileFilter: imageFilter,
-  limits    : { fileSize: 2 * 1024 * 1024 },
-}).single("avatar");
-
-/** OCR scan: image or PDF, max 10MB */
-const uploadOCR = multer({
-  storage   : makeStorage("ocr"),
-  fileFilter: reportFilter,
-  limits    : { fileSize: 10 * 1024 * 1024 },
-}).single("file");
-
-/** General single file, max 5MB */
-const uploadGeneral = multer({
-  storage   : makeStorage("general"),
-  fileFilter: anyFileFilter,
-  limits    : { fileSize: 5 * 1024 * 1024 },
-}).single("file");
-
-/** Multiple files (max 5), max 20MB total */
-const uploadMultiple = multer({
-  storage   : makeStorage("general"),
-  fileFilter: anyFileFilter,
-  limits    : { fileSize: 20 * 1024 * 1024 },
-}).array("files", 5);
-
-// ── Multer error handler wrapper ──────────────────────────────
-/**
- * Wraps any multer uploader to produce clean JSON errors
- * Usage: router.post("/upload", handleUpload(uploadReport), controller)
- */
-const handleUpload = (uploader) => (req, res, next) => {
-  uploader(req, res, (err) => {
-    if (!err) return next();
-
-    if (err instanceof multer.MulterError) {
-      const msg =
-        err.code === "LIMIT_FILE_SIZE"
-          ? "File too large."
-          : err.code === "LIMIT_UNEXPECTED_FILE"
-          ? "Unexpected file field."
-          : err.message;
-      return res.status(400).json({ success: false, message: msg });
+// Multer error handler middleware
+const handleUploadError = (err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return errorResponse(res, "File too large. Max 10MB allowed.", 400);
     }
-
-    return res.status(400).json({ success: false, message: err.message || "Upload failed." });
-  });
+    return errorResponse(res, err.message, 400);
+  }
+  if (err) return errorResponse(res, err.message, 400);
+  next();
 };
 
 module.exports = {
-  uploadReport,
-  uploadAvatar,
-  uploadOCR,
-  uploadGeneral,
-  uploadMultiple,
-  handleUpload,
-  UPLOAD_DIRS,
+  upload,
+  uploadImage,
+  uploadToCloudinary,
+  deleteFromCloudinary,
+  handleUploadError,
 };

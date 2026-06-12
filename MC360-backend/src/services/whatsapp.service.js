@@ -1,61 +1,55 @@
-import { sendMedicineReminder, sendAppointmentReminder, sendEmergencyAlert } from "../config/twilio.js";
-import Medicine from "../models/Medicine.model.js";
-import Appointment from "../models/Appointment.model.js";
-import Patient from "../models/Patient.model.js";
+const { getTwilioClient } = require("../config/twilio");
+const env = require("../config/env");
+const logger = require("../utils/logger");
 
-/**
- * Send medicine reminder to patient
- */
-export const triggerMedicineReminder = async (medicineId) => {
-  const medicine = await Medicine.findById(medicineId).populate("patientId");
-  if (!medicine) throw new Error("Medicine not found");
+const sendWhatsApp = async (to, message) => {
+  const client = getTwilioClient();
+  if (!client) {
+    logger.warn(`WhatsApp not sent (Twilio not configured). To: ${to}`);
+    return;
+  }
 
-  const patient = await Patient.findOne({ userId: medicine.patientId });
-  if (!patient?.whatsappNumber) throw new Error("Patient WhatsApp number not set");
+  try {
+    const formatted = to.startsWith("whatsapp:") ? to : `whatsapp:${to}`;
+    const result = await client.messages.create({
+      body: message,
+      from: env.TWILIO_WHATSAPP_FROM,
+      to: formatted,
+    });
+    logger.info(`WhatsApp sent to ${to}: ${result.sid}`);
+    return result;
+  } catch (err) {
+    logger.error(`WhatsApp send error: ${err.message}`);
+  }
+};
 
-  await sendMedicineReminder(
-    patient.whatsappNumber,
-    medicine.name,
-    medicine.dosage,
-    new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })
+const sendSMS = async (to, message) => {
+  const client = getTwilioClient();
+  if (!client) {
+    logger.warn(`SMS not sent (Twilio not configured). To: ${to}`);
+    return;
+  }
+
+  try {
+    const result = await client.messages.create({
+      body: message,
+      from: env.TWILIO_PHONE_NUMBER,
+      to,
+    });
+    logger.info(`SMS sent to ${to}: ${result.sid}`);
+    return result;
+  } catch (err) {
+    logger.error(`SMS send error: ${err.message}`);
+  }
+};
+
+const sendAppointmentReminder = (phone, { doctorName, date, time, type }) =>
+  sendWhatsApp(
+    phone,
+    `🏥 *MC360 Appointment Reminder*\n\nHi! You have an appointment with *Dr. ${doctorName}* on *${date}* at *${time}*.\nType: ${type}\n\nPlease arrive 10 minutes early.`
   );
 
-  return { message: "Medicine reminder sent" };
-};
+const sendMedicineReminder = (phone, { medicineName, dosage, timing }) =>
+  sendSMS(phone, `MC360 Reminder: Time to take ${medicineName} (${dosage}) — ${timing}`);
 
-/**
- * Send appointment reminder to patient
- */
-export const triggerAppointmentReminder = async (appointmentId) => {
-  const appointment = await Appointment.findById(appointmentId)
-    .populate("patientId")
-    .populate("doctorId", "name");
-
-  if (!appointment) throw new Error("Appointment not found");
-
-  const patient = await Patient.findOne({ userId: appointment.patientId });
-  if (!patient?.whatsappNumber) throw new Error("Patient WhatsApp number not set");
-
-  await sendAppointmentReminder(
-    patient.whatsappNumber,
-    `Dr. ${appointment.doctorId.name}`,
-    appointment.date,
-    appointment.timeSlot
-  );
-
-  return { message: "Appointment reminder sent" };
-};
-
-/**
- * Send emergency alert to emergency contact
- */
-export const triggerEmergencyWhatsApp = async (patientId, alertMessage) => {
-  const patient = await Patient.findOne({ userId: patientId });
-  if (!patient) throw new Error("Patient not found");
-
-  const contactNumber = patient.emergencyContact?.phone;
-  if (!contactNumber) throw new Error("No emergency contact set");
-
-  await sendEmergencyAlert(contactNumber, patient.name, alertMessage);
-  return { message: "Emergency alert sent" };
-};
+module.exports = { sendWhatsApp, sendSMS, sendAppointmentReminder, sendMedicineReminder };

@@ -1,38 +1,57 @@
-import mongoose from 'mongoose'
+const mongoose = require("mongoose");
 
-const dietPlanSchema = new mongoose.Schema({
-  patient: {
-    type:     mongoose.Schema.Types.ObjectId,
-    ref:      'User',
-    required: true,
-  },
+const mealSchema = new mongoose.Schema({
+  time: String,
+  name: String,
+  items: [
+    {
+      food: String,
+      quantity: String,
+      calories: Number,
+      protein: Number,
+      carbs: Number,
+      fat: Number,
+    },
+  ],
+  totalCalories: Number,
+});
 
-  input: { type: mongoose.Schema.Types.Mixed }, // patient profile used to generate
-
-  plan: {
+const dietPlanSchema = new mongoose.Schema(
+  {
+    patient: { type: mongoose.Schema.Types.ObjectId, ref: "Patient", required: true },
+    generatedBy: { type: String, enum: ["ai", "doctor", "nutritionist"], default: "ai" },
+    doctor: { type: mongoose.Schema.Types.ObjectId, ref: "Doctor" },
+    title: String,
+    goal: {
+      type: String,
+      enum: ["Weight Loss", "Weight Gain", "Muscle Building", "Diabetes Management", "Heart Health", "General Wellness", "muscle-gain", "weight-loss", "weight-gain", "diabetes-management", "heart-health", "general-wellness"],
+      default: "General Wellness",
+    },
+    duration: Number, // days
     totalCalories: Number,
+    dailyCalorieTarget: Number,
     macros: {
-      protein: String,
-      carbs:   String,
-      fats:    String,
-      fiber:   String,
+      protein: Number,  // grams
+      carbs: Number,
+      fat: Number,
+      fiber: Number,
     },
-    meals: {
-      earlyMorning: mongoose.Schema.Types.Mixed,
-      breakfast:    mongoose.Schema.Types.Mixed,
-      midMorning:   mongoose.Schema.Types.Mixed,
-      lunch:        mongoose.Schema.Types.Mixed,
-      evening:      mongoose.Schema.Types.Mixed,
-      dinner:       mongoose.Schema.Types.Mixed,
-    },
-    hydration:   String,
-    avoidFoods:  [String],
-    tips:        [String],
-    disclaimer:  String,
+    restrictions: [String], // ["gluten-free", "vegetarian"]
+    days: [
+      {
+        totalCalories: Number,
+        breakfast: { name: String, description: String, calories: Number },
+        lunch: { name: String, description: String, calories: Number },
+        snack: { name: String, description: String, calories: Number },
+        dinner: { name: String, description: String, calories: Number },
+      },
+    ],
+    notes: String,
+    isActive: { type: Boolean, default: true },
+    startDate: Date,
+    endDate: Date,
   },
+  { timestamps: true }
+);
 
-  isActive:   { type: Boolean, default: true },
-  generatedBy:{ type: String, default: 'gemini-ai' },
-}, { timestamps: true })
-
-export default mongoose.model('DietPlan', dietPlanSchema)
+module.exports = mongoose.model("DietPlan", dietPlanSchema);

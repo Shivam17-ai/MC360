@@ -1,46 +1,52 @@
-import mongoose from 'mongoose'
+const mongoose = require("mongoose");
 
-const appointmentSchema = new mongoose.Schema({
-  patient: {
-    type:     mongoose.Schema.Types.ObjectId,
-    ref:      'User',
-    required: true,
+const appointmentSchema = new mongoose.Schema(
+  {
+    appointmentId: { type: String, unique: true },
+    patient: { type: mongoose.Schema.Types.ObjectId, ref: "Patient", required: true },
+    doctor: { type: mongoose.Schema.Types.ObjectId, ref: "Doctor", required: true },
+    hospital: { type: mongoose.Schema.Types.ObjectId, ref: "Hospital" },
+    date: { type: Date, required: true },
+    timeSlot: { type: String, required: true }, // "10:00 - 10:30"
+    type: {
+      type: String,
+      enum: ["in-person", "telemedicine", "home-visit"],
+      default: "in-person",
+    },
+    status: {
+      type: String,
+      enum: ["pending", "confirmed", "cancelled", "completed", "no-show", "rescheduled"],
+      default: "pending",
+    },
+    reason: { type: String },
+    notes: { type: String }, // doctor's notes after appointment
+    prescription: { type: mongoose.Schema.Types.ObjectId, ref: "Prescription" },
+    symptoms: [String],
+    followUpRequired: { type: Boolean, default: false },
+    followUpDate: { type: Date },
+    cancelReason: { type: String },
+    cancelledBy: { type: String, enum: ["patient", "doctor", "system"] },
+    fee: { type: Number, default: 0 },
+    isPaid: { type: Boolean, default: false },
+    paymentId: { type: String },
+    rating: { type: Number, min: 1, max: 5 },
+    review: { type: String },
+    videoSessionId: { type: String },
+    reminderSent: { type: Boolean, default: false },
   },
-  doctor: {
-    type:     mongoose.Schema.Types.ObjectId,
-    ref:      'Doctor',
-    required: true,
-  },
-  hospital: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref:  'Hospital',
-  },
+  { timestamps: true }
+);
 
-  date:   { type: String, required: true }, // 'YYYY-MM-DD'
-  time:   { type: String, required: true }, // '10:30 AM'
-  type:   { type: String, enum: ['in-person', 'video', 'phone'], default: 'in-person' },
-  reason: { type: String },
+appointmentSchema.pre("save", async function (next) {
+  if (!this.appointmentId) {
+    const count = await mongoose.model("Appointment").countDocuments();
+    this.appointmentId = `MC360-A-${String(count + 1).padStart(7, "0")}`;
+  }
+  next();
+});
 
-  status: {
-    type:    String,
-    enum:    ['pending', 'confirmed', 'completed', 'cancelled', 'no-show'],
-    default: 'pending',
-  },
+appointmentSchema.index({ patient: 1, date: -1 });
+appointmentSchema.index({ doctor: 1, date: -1 });
+appointmentSchema.index({ status: 1 });
 
-  cancelReason: { type: String },
-
-  prescription: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref:  'Prescription',
-  },
-
-  videoSessionId: { type: String },
-  notes:          { type: String },
-  fee:            { type: Number },
-  isPaid:         { type: Boolean, default: false },
-}, { timestamps: true })
-
-// Index for slot conflict check
-appointmentSchema.index({ doctor: 1, date: 1, time: 1 })
-
-export default mongoose.model('Appointment', appointmentSchema)
+module.exports = mongoose.model("Appointment", appointmentSchema);

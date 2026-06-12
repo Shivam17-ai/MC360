@@ -1,58 +1,20 @@
-/**
- * rateLimiter.middleware.js
- * Prevents brute-force and API abuse using express-rate-limit
- * Install: npm install express-rate-limit
- */
-
 const rateLimit = require("express-rate-limit");
 
-// ── General API limiter (all routes) ─────────────────────────
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,   // 15 minutes
-  max: 200,                    // max 200 requests per window per IP
-  standardHeaders: true,
-  legacyHeaders:  false,
-  message: {
-    success: false,
-    message: "Too many requests. Please try again after 15 minutes.",
-  },
-});
+const createLimiter = (windowMinutes, max, message) =>
+  rateLimit({
+    windowMs: windowMinutes * 60 * 1000,
+    max,
+    message: { success: false, message },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
 
-// ── Auth routes limiter (login / register) ────────────────────
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,   // 15 minutes
-  max: 10,                     // max 10 login attempts per window
-  standardHeaders: true,
-  legacyHeaders:  false,
-  skipSuccessfulRequests: true,
-  message: {
-    success: false,
-    message: "Too many login attempts. Please try again after 15 minutes.",
-  },
-});
+const globalLimiter = createLimiter(15, 200, "Too many requests. Please slow down.");
 
-// ── AI / ML routes limiter ────────────────────────────────────
-const aiLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,   // 1 hour
-  max: 30,                     // max 30 AI requests per hour
-  standardHeaders: true,
-  legacyHeaders:  false,
-  message: {
-    success: false,
-    message: "AI request limit reached. Please try again after an hour.",
-  },
-});
+const authLimiter = createLimiter(15, 10, "Too many auth attempts. Try again in 15 minutes.");
 
-// ── File upload limiter ───────────────────────────────────────
-const uploadLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,   // 1 hour
-  max: 20,                     // max 20 uploads per hour
-  standardHeaders: true,
-  legacyHeaders:  false,
-  message: {
-    success: false,
-    message: "Upload limit reached. Please try again after an hour.",
-  },
-});
+const aiLimiter = createLimiter(60, 30, "AI request limit reached. Please wait an hour.");
 
-module.exports = { apiLimiter, authLimiter, aiLimiter, uploadLimiter };
+const uploadLimiter = createLimiter(60, 20, "Upload limit reached. Please wait an hour.");
+
+module.exports = { globalLimiter, authLimiter, aiLimiter, uploadLimiter };

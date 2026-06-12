@@ -1,33 +1,45 @@
-import mongoose from 'mongoose'
+const mongoose = require("mongoose");
 
-const adherenceLogSchema = new mongoose.Schema({
-  date:  { type: Date, default: Date.now },
-  time:  { type: String },
-  taken: { type: Boolean, default: false },
-}, { _id: false })
-
-const medicineSchema = new mongoose.Schema({
-  patient: {
-    type:     mongoose.Schema.Types.ObjectId,
-    ref:      'User',
-    required: true,
+const medicineSchema = new mongoose.Schema(
+  {
+    patient: { type: mongoose.Schema.Types.ObjectId, ref: "Patient", required: true },
+    name: { type: String, required: true },
+    genericName: String,
+    dosage: String,
+    frequency: {
+      type: String,
+      enum: ["once-daily", "twice-daily", "thrice-daily", "four-times-daily", "as-needed", "weekly", "custom"],
+      default: "once-daily",
+    },
+    customFrequency: String,
+    timings: [String], // ["08:00", "14:00", "20:00"]
+    startDate: { type: Date, required: true },
+    endDate: { type: Date },
+    isOngoing: { type: Boolean, default: false },
+    instructions: String,
+    prescriptionId: { type: mongoose.Schema.Types.ObjectId, ref: "Prescription" },
+    purpose: String,
+    sideEffectsNoted: [String],
+    isActive: { type: Boolean, default: true },
+    reminderEnabled: { type: Boolean, default: true },
+    adherenceLogs: [
+      {
+        date: { type: Date },
+        taken: { type: Boolean, default: false },
+        takenAt: Date,
+        skippedReason: String,
+      },
+    ],
+    totalDoses: { type: Number, default: 0 },
+    takenDoses: { type: Number, default: 0 },
+    adherencePercentage: { type: Number, default: 0 },
   },
-  prescription: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref:  'Prescription',
-  },
+  { timestamps: true }
+);
 
-  name:         { type: String, required: true, trim: true },
-  dose:         { type: String },
-  frequency:    { type: String },
-  times:        [{ type: String }], // ['8:00 AM', '8:00 PM']
-  startDate:    { type: Date },
-  endDate:      { type: Date },
-  instructions: { type: String },
+medicineSchema.methods.calculateAdherence = function () {
+  if (this.totalDoses === 0) return 0;
+  return Math.round((this.takenDoses / this.totalDoses) * 100);
+};
 
-  adherenceLog: [adherenceLogSchema],
-  isActive:     { type: Boolean, default: true },
-  reminderOn:   { type: Boolean, default: true },
-}, { timestamps: true })
-
-export default mongoose.model('Medicine', medicineSchema)
+module.exports = mongoose.model("Medicine", medicineSchema);

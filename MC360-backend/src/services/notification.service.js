@@ -1,62 +1,82 @@
-import Notification from "../models/Notification.model.js";
+const Notification = require("../models/Notification.model");
+const User = require("../models/User.model");
+const { sendEmail } = require("../utils/sendEmail");
+const logger = require("../utils/logger");
 
-/**
- * Create a notification
- */
-export const createNotification = async ({ userId, type, title, message, relatedId }) => {
-  return await Notification.create({ userId, type, title, message, relatedId });
+// Create and broadcast in-app notification
+const createNotification = async ({
+  userId,
+  title,
+  message,
+  type = "general",
+  priority = "medium",
+  data = null,
+  link = null,
+  channels = {},
+}) => {
+  const notification = await Notification.create({
+    user: userId,
+    title,
+    message,
+    type,
+    priority,
+    data,
+    link,
+    channels: { inApp: true, ...channels },
+  });
+
+  // Emit via socket if available
+  try {
+    const io = require("../sockets").getIO();
+    if (io) {
+      io.to(`user_${userId}`).emit("notification", notification);
+    }
+  } catch {}
+
+  return notification;
 };
 
-/**
- * Get all notifications for a user
- */
-export const getUserNotifications = async (userId, limit = 20) => {
-  return await Notification.find({ userId })
-    .sort({ createdAt: -1 })
-    .limit(limit);
+// Get user notifications
+const getUserNotifications = async (userId, { page = 1, limit = 20, unreadOnly = false } = {}) => {
+  const filter = { user: userId };
+  if (unreadOnly) filter.isRead = false;
+
+  const skip = (page - 1) * limit;
+  const [notifications, total, unreadCount] = await Promise.all([
+    Notification.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+    Notification.countDocuments(filter),
+    Notification.countDocuments({ user: userId, isRead: false }),
+  ]);
+
+  return {
+    notifications,
+    total,
+    unreadCount,
+    page,
+    totalPages: Math.ceil(total / limit),
+  };
 };
 
-/**
- * Mark one as read
- */
-export const markNotificationRead = async (notificationId, userId) => {
-  const notif = await Notification.findOneAndUpdate(
-    { _id: notificationId, userId },
-    { isRead: true },
+const markAsRead = async (notificationId, userId) => {
+  return Notification.findOneAndUpdate(
+    { _id: notificationId, user: userId },
+    { isRead: true, readAt: new Date() },
     { new: true }
   );
-  if (!notif) throw new Error("Notification not found");
-  return notif;
 };
 
-/**
- * Mark all as read for a user
- */
-export const markAllNotificationsRead = async (userId) => {
-  await Notification.updateMany({ userId, isRead: false }, { isRead: true });
-  return { message: "All notifications marked as read" };
+const markAllAsRead = async (userId) => {
+  return Notification.updateMany({ user: userId, isRead: false }, { isRead: true, readAt: new Date() });
 };
 
-/**
- * Delete a notification
- */
-export const deleteNotification = async (notificationId, userId) => {
-  const notif = await Notification.findOneAndDelete({ _id: notificationId, userId });
-  if (!notif) throw new Error("Notification not found");
-  return { message: "Notification deleted" };
+const deleteNotification = async (notificationId, userId) => {
+  return Notification.findOneAndDelete({ _id: notificationId, user: userId });
 };
 
-/**
- * Clear all notifications for a user
- */
-export const clearAllNotifications = async (userId) => {
-  await Notification.deleteMany({ userId });
-  return { message: "All notifications cleared" };
-};
-
-/**
- * Get unread count
- */
-export const getUnreadCount = async (userId) => {
-  return await Notification.countDocuments({ userId, isRead: false });
+module.exports = {
+  createNotification,
+  getUserNotifications,
+  markAsRead,
+  markAllAsRead,
+  deleteNotification,
 };

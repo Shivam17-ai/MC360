@@ -1,60 +1,40 @@
-/**
- * error.middleware.js
- * Global error handler — must be registered LAST in app.js
- * Returns consistent JSON error responses to the frontend
- */
+const logger = require("../utils/logger");
 
-const errorMiddleware = (err, req, res, next) => {
-  let statusCode = err.statusCode || err.status || 500;
-  let message    = err.message   || "Internal Server Error";
+const errorHandler = (err, req, res, next) => {
+  let statusCode = err.statusCode || 500;
+  let message = err.message || "Internal Server Error";
 
-  // ── Mongoose: CastError (invalid ObjectId) ────────────────
-  if (err.name === "CastError") {
-    statusCode = 400;
-    message    = `Invalid ${err.path}: ${err.value}`;
-  }
-
-  // ── Mongoose: Duplicate key ───────────────────────────────
+  // Mongoose duplicate key
   if (err.code === 11000) {
-    statusCode = 409;
     const field = Object.keys(err.keyValue)[0];
     message = `${field.charAt(0).toUpperCase() + field.slice(1)} already exists.`;
+    statusCode = 409;
   }
 
-  // ── Mongoose: Validation error ────────────────────────────
+  // Mongoose validation error
   if (err.name === "ValidationError") {
+    message = Object.values(err.errors).map((e) => e.message).join(", ");
     statusCode = 422;
-    message = Object.values(err.errors)
-      .map((e) => e.message)
-      .join(", ");
   }
 
-  // ── JWT errors ────────────────────────────────────────────
+  // Mongoose CastError (invalid ObjectId)
+  if (err.name === "CastError") {
+    message = `Invalid ${err.path}: ${err.value}`;
+    statusCode = 400;
+  }
+
+  // JWT errors
   if (err.name === "JsonWebTokenError") {
+    message = "Invalid token.";
     statusCode = 401;
-    message    = "Invalid token.";
   }
   if (err.name === "TokenExpiredError") {
+    message = "Token expired.";
     statusCode = 401;
-    message    = "Token expired. Please login again.";
   }
 
-  // ── Multer errors ─────────────────────────────────────────
-  if (err.code === "LIMIT_FILE_SIZE") {
-    statusCode = 413;
-    message    = "File too large. Maximum allowed size exceeded.";
-  }
-  if (err.code === "LIMIT_UNEXPECTED_FILE") {
-    statusCode = 400;
-    message    = "Unexpected file field.";
-  }
-
-  // ── Log to console (not in test env) ─────────────────────
-  if (process.env.NODE_ENV !== "test") {
-    console.error(
-      `\x1b[31m[ERROR]\x1b[0m ${statusCode} — ${message}`,
-      process.env.NODE_ENV === "development" ? err.stack : ""
-    );
+  if (statusCode === 500) {
+    logger.error(`Server Error: ${err.stack}`);
   }
 
   res.status(statusCode).json({
@@ -64,14 +44,11 @@ const errorMiddleware = (err, req, res, next) => {
   });
 };
 
-/**
- * 404 handler — attach BEFORE errorMiddleware
- * Catches any unmatched route
- */
-const notFoundMiddleware = (req, res, next) => {
-  const err = new Error(`Route not found: ${req.method} ${req.originalUrl}`);
-  err.statusCode = 404;
-  next(err);
+const notFound = (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Route not found: ${req.method} ${req.originalUrl}`,
+  });
 };
 
-module.exports = { errorMiddleware, notFoundMiddleware };
+module.exports = { errorHandler, notFound };

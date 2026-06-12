@@ -1,40 +1,25 @@
-import mongoose from 'mongoose'
+const mongoose = require("mongoose");
 
-const videoSessionSchema = new mongoose.Schema({
-  appointment: {
-    type:     mongoose.Schema.Types.ObjectId,
-    ref:      'Appointment',
-    required: true,
+const videoSessionSchema = new mongoose.Schema(
+  {
+    sessionId: { type: String, unique: true, required: true },
+    appointment: { type: mongoose.Schema.Types.ObjectId, ref: "Appointment" },
+    patient: { type: mongoose.Schema.Types.ObjectId, ref: "Patient", required: true },
+    doctor: { type: mongoose.Schema.Types.ObjectId, ref: "Doctor", required: true },
+    status: {
+      type: String,
+      enum: ["waiting", "active", "ended", "cancelled", "no-show"],
+      default: "waiting",
+    },
+    startedAt: Date,
+    endedAt: Date,
+    duration: Number, // seconds
+    patientJoined: { type: Boolean, default: false },
+    doctorJoined: { type: Boolean, default: false },
+    notes: String,
+    recordingUrl: String,
   },
-  patient: {
-    type:     mongoose.Schema.Types.ObjectId,
-    ref:      'User',
-    required: true,
-  },
-  doctor: {
-    type:     mongoose.Schema.Types.ObjectId,
-    ref:      'Doctor',
-    required: true,
-  },
+  { timestamps: true }
+);
 
-  sessionId:  { type: String, unique: true, required: true },
-  roomName:   { type: String },
-
-  status: {
-    type:    String,
-    enum:    ['scheduled', 'active', 'ended', 'missed'],
-    default: 'scheduled',
-  },
-
-  startedAt:      { type: Date },
-  endedAt:        { type: Date },
-  durationSeconds:{ type: Number },
-
-  patientJoined:  { type: Boolean, default: false },
-  doctorJoined:   { type: Boolean, default: false },
-
-  recordingUrl:   { type: String },
-  notes:          { type: String },
-}, { timestamps: true })
-
-export default mongoose.model('VideoSession', videoSessionSchema)
+module.exports = mongoose.model("VideoSession", videoSessionSchema);

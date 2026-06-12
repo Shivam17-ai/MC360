@@ -1,107 +1,50 @@
-/**
- * medicineReminder.job.js
- * Cron job — runs every minute to match exact HH:MM timings
- * Sends medicine reminders based on user-set timings
- */
-
 const cron = require("node-cron");
-const Medicine = require("../models/medicine.model");
-const { sendNotification } = require("../sockets/notification.socket");
-const { createNotification } = require("../utils/notification.util");
+const Medicine = require("../models/Medicine.model");
+const Patient = require("../models/Patient.model");
+const { createNotification } = require("../services/notification.service");
+const { sendMedicineReminder } = require("../services/whatsapp.service");
+const logger = require("../utils/logger");
 
-// ── Match current hour:minute to medicine timings ─────────────
-const isTimeMatch = (timings = []) => {
-  const now = new Date();
-  const currentHour   = now.getHours().toString().padStart(2, "0");
-  const currentMinute = now.getMinutes().toString().padStart(2, "0");
-  const currentTime   = `${currentHour}:${currentMinute}`;
-
-  return timings.some((t) => t === currentTime);
-};
-
-// ── Main job function ─────────────────────────────────────────
-const sendMedicineReminders = async () => {
+// Runs every hour at minute 0
+const medicineReminderJob = cron.schedule("0 * * * *", async () => {
+  logger.info("Running medicine reminder job...");
   try {
-    // FIX: Normalize today to the start of the day (00:00:00) 
-    // to prevent dropping medicines that expire today.
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
+    const currentHour = new Date().getHours();
+    const currentTime = `${String(currentHour).padStart(2, "0")}:00`;
 
-    // Only active medicines (not expired / not deleted)
     const medicines = await Medicine.find({
-      timings: { $exists: true, $not: { $size: 0 } },
-      $or: [
-        { endDate: { $gte: startOfToday } },
-        { endDate: null },
-        { endDate: { $exists: false } },
-      ],
-    }).populate("userId", "_id name");
+      isActive: true,
+      reminderEnabled: true,
+      timings: currentTime,
+      $or: [{ endDate: null }, { endDate: { $gte: new Date() } }],
+    }).populate({ path: "patient", populate: { path: "user", select: "name phone notificationPreferences" } });
 
-    if (!medicines.length) {
-      return; // Quiet return to reduce log spam every single minute
-    }
+    logger.info(`Found ${medicines.length} medicine reminders to send`);
 
-    let sent = 0;
+    for (const medicine of medicines) {
+      const patient = medicine.patient;
+      if (!patient?.user) continue;
 
-    for (const med of medicines) {
       try {
-        if (!isTimeMatch(med.timings)) continue;
+        await createNotification({
+          userId: patient.user._id,
+          title: "Medicine Reminder 💊",
+          message: `Time to take ${medicine.name} (${medicine.dosage || ""})`,
+          type: "medicine",
+          priority: "high",
+          data: { medicineId: medicine._id },
+        });
 
-        const patientId = med.userId?._id?.toString();
-        if (!patientId) continue;
-
-        const title   = "💊 Medicine Reminder";
-        const message = `Time to take ${med.name} — ${med.dosage}.${
-          med.notes ? ` Note: ${med.notes}` : ""
-        }`;
-
-        // Send out notifications via DB tracking and real-time sockets
-        await createNotification({ userId: patientId, title, message, type: "medicine" });
-        sendNotification(patientId, { title, message, type: "medicine" });
-
-        // NOTE: Individual 'isTaken' resetting removed from here. 
-        // The specialized resetDailyAdherence job below handles this elegantly at midnight.
-
-        sent++;
-      } catch (innerErr) {
-        console.error(`[MedicineReminder] Error for medicine ${med._id}:`, innerErr.message);
+        if (patient.user.notificationPreferences?.sms && patient.user.phone) {
+          await sendMedicineReminder(patient.user.phone, { medicineName: medicine.name, dosage: medicine.dosage, timing: currentTime });
+        }
+      } catch (err) {
+        logger.error(`Medicine reminder failed for ${medicine._id}: ${err.message}`);
       }
     }
-
-    if (sent > 0) console.log(`[MedicineReminder] Sent ${sent} reminder(s).`);
   } catch (err) {
-    console.error("[MedicineReminder] Job failed:", err.message);
+    logger.error(`Medicine reminder job error: ${err.message}`);
   }
-};
+}, { scheduled: false });
 
-// ── Daily reset: mark all medicines as not-taken at midnight ──
-const resetDailyAdherence = async () => {
-  try {
-    const result = await Medicine.updateMany({ isTaken: true }, { isTaken: false });
-    console.log(`[MedicineReminder] Daily reset — ${result.modifiedCount} medicine(s) reset.`);
-  } catch (err) {
-    console.error("[MedicineReminder] Daily reset failed:", err.message);
-  }
-};
-
-/**
- * Schedules:
- * - Every minute: check timings
- * - Midnight: reset isTaken flag
- */
-const scheduleMedicineReminders = () => {
-  // Check every minute for matching timings
-  cron.schedule("* * * * *", async () => {
-    await sendMedicineReminders();
-  });
-
-  // Reset adherence at midnight
-  cron.schedule("0 0 * * *", async () => {
-    console.log(`[MedicineReminder] Midnight reset at ${new Date().toISOString()}`);
-    await resetDailyAdherence();
-  });
-
-  console.log("[MedicineReminder] Jobs scheduled — every minute + midnight reset");
-};
-
-module.exports = { scheduleMedicineReminders, sendMedicineReminders, resetDailyAdherence };
+module.exports = medicineReminderJob;

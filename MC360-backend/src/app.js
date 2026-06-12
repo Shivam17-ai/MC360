@@ -1,84 +1,54 @@
-import express from "express";
-import cors from "cors";
-import helmet from "helmet";
-import morgan from "morgan";
-import cookieParser from "cookie-parser";
-import compression from "compression";
-import rateLimit from "express-rate-limit";
-import env from "./config/env.js";
-import routes from "./routes/index.js";
-import { errorHandler, notFound } from "./middlewares/error.middleware.js";
+const express = require("express");
+const cors = require("cors");
+const helmet = require("helmet");
+const morgan = require("morgan");
+const compression = require("compression");
+const mongoSanitize = require("express-mongo-sanitize");
+const hpp = require("hpp");
+
+const routes = require("./routes");
+const { globalLimiter } = require("./middlewares/rateLimiter.middleware");
+const { errorHandler, notFound } = require("./middlewares/error.middleware");
+const env = require("./config/env");
 
 const app = express();
 
-// ── Security headers ──────────────────────────────────────────────────────
+// ── Security ─────────────────────────────────────────────────────────────────
 app.use(helmet());
+app.use(mongoSanitize());
+app.use(hpp());
 
-// ── CORS ──────────────────────────────────────────────────────────────────
+// ── CORS ──────────────────────────────────────────────────────────────────────
 app.use(cors({
-  origin: [
-    env.FRONTEND_URL,
-    "http://localhost:5173",
-    "http://localhost:3000",
-  ],
+  origin: [env.CLIENT_URL, "http://localhost:5173", "http://localhost:3000"],
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
 
-// ── Body parsers ──────────────────────────────────────────────────────────
+// ── Body parsing ──────────────────────────────────────────────────────────────
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-app.use(cookieParser());
-
-// ── Compression ───────────────────────────────────────────────────────────
 app.use(compression());
 
-// ── HTTP logger (dev only) ────────────────────────────────────────────────
-if (env.IS_DEV) {
-  app.use(morgan("dev"));
+// ── Logging ───────────────────────────────────────────────────────────────────
+if (env.NODE_ENV !== "test") {
+  app.use(morgan(env.NODE_ENV === "development" ? "dev" : "combined"));
 }
 
-// ── Global rate limiter ───────────────────────────────────────────────────
-const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,   // 15 minutes
-  max: 200,                    // max 200 requests per window
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message: "Too many requests. Please try again after 15 minutes.",
-  },
-});
-app.use(globalLimiter);
+// ── Rate limiting ─────────────────────────────────────────────────────────────
+app.use("/api", globalLimiter);
 
-// ── Health check ──────────────────────────────────────────────────────────
-app.get("/", (req, res) => {
-  res.json({
-    success: true,
-    message: "MC360 API is running 🚀",
-    version: "1.0.0",
-    environment: env.NODE_ENV,
-    timestamp: new Date().toISOString(),
-  });
-});
-
+// ── Health check ──────────────────────────────────────────────────────────────
 app.get("/health", (req, res) => {
-  res.json({
-    success: true,
-    status: "healthy",
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
-  });
+  res.json({ status: "ok", uptime: process.uptime(), timestamp: new Date().toISOString(), env: env.NODE_ENV });
 });
 
-// ── API routes ────────────────────────────────────────────────────────────
+// ── API Routes ────────────────────────────────────────────────────────────────
 app.use("/api/v1", routes);
 
-// ── 404 handler ───────────────────────────────────────────────────────────
+// ── 404 & Error handlers ──────────────────────────────────────────────────────
 app.use(notFound);
-
-// ── Global error handler ──────────────────────────────────────────────────
 app.use(errorHandler);
 
-export default app;
+module.exports = app;

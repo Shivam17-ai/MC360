@@ -1,98 +1,99 @@
-import QueueToken from "../models/QueueToken.model.js";
-import Appointment from "../models/Appointment.model.js";
+const QueueToken = require("../models/QueueToken.model");
+const { createNotification } = require("./notification.service");
+const logger = require("../utils/logger");
 
-/**
- * Generate queue token for an appointment
- */
-export const generateQueueToken = async (appointmentId, doctorId) => {
-  // Check existing token
-  const existing = await QueueToken.findOne({
-    appointmentId,
-    status: { $in: ["waiting", "called"] },
-  });
-  if (existing) return existing;
-
-  // Get last token number for this doctor today
+const generateToken = async ({ patientId, doctorId, hospitalId, appointmentId, type = "appointment" }) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   const lastToken = await QueueToken.findOne({
-    doctorId,
-    createdAt: { $gte: today },
+    hospital: hospitalId,
+    doctor: doctorId,
+    date: { $gte: today },
   }).sort({ tokenNumber: -1 });
 
   const tokenNumber = lastToken ? lastToken.tokenNumber + 1 : 1;
-
-  // Estimate wait time (15 mins per patient ahead)
-  const waitingCount = await QueueToken.countDocuments({
-    doctorId,
-    status: "waiting",
-    createdAt: { $gte: today },
-  });
-  const estimatedWaitTime = waitingCount * 15;
+  const prefix = type === "emergency" ? "E" : "A";
+  const tokenDisplay = `${prefix}-${String(tokenNumber).padStart(3, "0")}`;
 
   const token = await QueueToken.create({
-    appointmentId,
-    doctorId,
     tokenNumber,
-    estimatedWaitTime,
+    tokenDisplay,
+    patient: patientId,
+    doctor: doctorId,
+    hospital: hospitalId,
+    appointment: appointmentId,
+    type,
     status: "waiting",
+    date: new Date(),
   });
+
+  // Estimate wait time: 15 min per person ahead
+  const ahead = await QueueToken.countDocuments({
+    hospital: hospitalId,
+    doctor: doctorId,
+    date: { $gte: today },
+    status: "waiting",
+    tokenNumber: { $lt: tokenNumber },
+  });
+
+  token.estimatedWaitTime = ahead * 15;
+  await token.save();
+
+  // Broadcast to queue board
+  try {
+    const io = require("../sockets").getIO();
+    if (io) io.to(`queue_${hospitalId}_${doctorId}`).emit("queue_update", { type: "new_token", token });
+  } catch {}
 
   return token;
 };
 
-/**
- * Get live queue for a doctor
- */
-export const getLiveQueue = async (doctorId) => {
+const callNextToken = async (doctorId, hospitalId) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const queue = await QueueToken.find({
-    doctorId,
-    status: { $in: ["waiting", "called"] },
-    createdAt: { $gte: today },
+  const next = await QueueToken.findOne({
+    doctor: doctorId,
+    hospital: hospitalId,
+    date: { $gte: today },
+    status: "waiting",
   })
-    .populate({
-      path: "appointmentId",
-      populate: { path: "patientId", select: "name phone" },
-    })
-    .sort({ tokenNumber: 1 });
+    .sort({ tokenNumber: 1 })
+    .populate({ path: "patient", populate: { path: "user", select: "name" } });
 
-  return queue;
+  if (!next) return null;
+
+  next.status = "called";
+  next.calledAt = new Date();
+  await next.save();
+
+  try {
+    const io = require("../sockets").getIO();
+    if (io) io.to(`queue_${hospitalId}_${doctorId}`).emit("queue_update", { type: "called", token: next });
+  } catch {}
+
+  return next;
 };
 
-/**
- * Update token status
- */
-export const updateTokenStatus = async (tokenId, status) => {
-  const token = await QueueToken.findByIdAndUpdate(
-    tokenId,
-    { status },
-    { new: true }
-  );
-  if (!token) throw new Error("Token not found");
-  return token;
-};
-
-/**
- * Get patient's current token
- */
-export const getPatientToken = async (patientId) => {
+const getQueueStatus = async (doctorId, hospitalId) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const appointment = await Appointment.findOne({
-    patientId,
-    date: new Date().toISOString().split("T")[0],
-    status: "confirmed",
-  });
+  const tokens = await QueueToken.find({
+    doctor: doctorId,
+    hospital: hospitalId,
+    date: { $gte: today },
+    status: { $in: ["waiting", "called", "in-progress"] },
+  })
+    .sort({ tokenNumber: 1 })
+    .populate({ path: "patient", populate: { path: "user", select: "name avatar" } });
 
-  if (!appointment) return null;
-
-  return await QueueToken.findOne({
-    appointmentId: appointment._id,
-    status: { $in: ["waiting", "called"] },
-  });
+  return tokens;
 };
+
+const updateTokenStatus = async (tokenId, status) => {
+  return QueueToken.findByIdAndUpdate(tokenId, { status }, { new: true });
+};
+
+module.exports = { generateToken, callNextToken, getQueueStatus, updateTokenStatus };

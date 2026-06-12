@@ -1,112 +1,205 @@
-import Appointment from "../models/Appointment.model.js";
-import Doctor from "../models/Doctor.model.js";
-import Patient from "../models/Patient.model.js";
-import Notification from "../models/Notification.model.js";
-import { sendAppointmentReminder } from "../config/twilio.js";
+const Appointment = require("../models/Appointment.model");
+const Doctor = require("../models/Doctor.model");
+const Patient = require("../models/Patient.model");
+const { createNotification } = require("./notification.service");
+const { sendAppointmentConfirmation } = require("../utils/sendEmail");
+const { sendAppointmentReminder } = require("./whatsapp.service");
+const logger = require("../utils/logger");
 
-/**
- * Book a new appointment
- */
-export const bookAppointment = async ({
-  patientId, doctorId, hospitalId, type, date, timeSlot, symptoms, notes,
+const bookAppointment = async ({
+  patientUserId,
+  doctorId,
+  hospitalId,
+  date,
+  timeSlot,
+  type,
+  reason,
+  symptoms,
 }) => {
-  // Check slot not already taken
-  const conflict = await Appointment.findOne({
-    doctorId,
-    date,
+  const [patient, doctor] = await Promise.all([
+    Patient.findOne({ user: patientUserId }).populate("user"),
+    Doctor.findById(doctorId).populate("user"),
+  ]);
+
+  if (!patient) throw Object.assign(new Error("Patient profile not found."), { statusCode: 404 });
+  if (!doctor) throw Object.assign(new Error("Doctor not found."), { statusCode: 404 });
+
+  // Check for double-booking
+  const existing = await Appointment.findOne({
+    doctor: doctorId,
+    date: new Date(date),
     timeSlot,
-    status: { $in: ["pending", "confirmed"] },
+    status: { $nin: ["cancelled", "rescheduled"] },
   });
-  if (conflict) throw new Error("This slot is already booked");
+  if (existing) throw Object.assign(new Error("This time slot is already booked."), { statusCode: 409 });
 
   const appointment = await Appointment.create({
-    patientId, doctorId, hospitalId, type,
-    date, timeSlot, symptoms, notes,
-    status: "pending",
+    patient: patient._id,
+    doctor: doctorId,
+    hospital: hospitalId || doctor.hospital,
+    date: new Date(date),
+    timeSlot,
+    type: type || "in-person",
+    reason,
+    symptoms,
+    fee: type === "telemedicine" ? doctor.telemedicineFee : doctor.consultationFee,
+    status: "confirmed",
   });
 
-  // Notify doctor
-  await Notification.create({
-    userId: doctorId,
+  // Notifications
+  try {
+    await createNotification({
+      userId: patientUserId,
+      title: "Appointment Confirmed",
+      message: `Your appointment with Dr. ${doctor.user.name} on ${new Date(date).toLocaleDateString()} at ${timeSlot} is confirmed.`,
+      type: "appointment",
+      data: { appointmentId: appointment._id },
+    });
+
+    await sendAppointmentConfirmation(patient.user, appointment);
+  } catch (err) {
+    logger.warn(`Post-booking notifications failed: ${err.message}`);
+  }
+
+  return appointment.populate([
+    { path: "doctor", populate: { path: "user", select: "name email phone avatar" } },
+    { path: "patient", populate: { path: "user", select: "name email phone" } },
+    { path: "hospital", select: "name address phone" },
+  ]);
+};
+
+const cancelAppointment = async (appointmentId, userId, reason) => {
+  const appointment = await Appointment.findById(appointmentId);
+  if (!appointment) throw Object.assign(new Error("Appointment not found."), { statusCode: 404 });
+
+  appointment.status = "cancelled";
+  appointment.cancelReason = reason;
+  await appointment.save();
+
+  await createNotification({
+    userId,
+    title: "Appointment Cancelled",
+    message: `Your appointment has been cancelled.`,
     type: "appointment",
-    title: "New Appointment Request",
-    message: `New ${type} appointment on ${date} at ${timeSlot}`,
-    relatedId: appointment._id,
   });
 
   return appointment;
 };
 
-/**
- * Get appointments with filters
- */
-export const getAppointments = async (userId, role, filters = {}) => {
-  const query = {};
+const rescheduleAppointment = async (appointmentId, { date, timeSlot }) => {
+  const appointment = await Appointment.findById(appointmentId);
+  if (!appointment) throw Object.assign(new Error("Appointment not found."), { statusCode: 404 });
 
-  if (role === "patient") query.patientId = userId;
-  else if (role === "doctor") query.doctorId = userId;
-  else if (role === "hospital_admin") query.hospitalId = filters.hospitalId;
+  appointment.date = new Date(date);
+  appointment.timeSlot = timeSlot;
+  appointment.status = "confirmed";
+  await appointment.save();
 
-  if (filters.status && filters.status !== "all") query.status = filters.status;
-  if (filters.type && filters.type !== "all") query.type = filters.type;
-  if (filters.date) query.date = filters.date;
-
-  const appointments = await Appointment.find(query)
-    .populate("patientId", "name phone")
-    .populate("doctorId", "name specialization")
-    .sort({ date: -1, timeSlot: 1 });
-
-  return appointments;
+  return appointment;
 };
 
-/**
- * Get available time slots for a doctor on a date
- */
-export const getAvailableSlots = async (doctorId, date) => {
-  const allSlots = [
-    "09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM",
-    "11:00 AM", "11:30 AM", "12:00 PM", "02:00 PM",
-    "02:30 PM", "03:00 PM", "03:30 PM", "04:00 PM",
-    "04:30 PM", "05:00 PM",
-  ];
+const generateSlots = (startTime, endTime, durationMins) => {
+  const slots = [];
+  const [startHour, startMin] = startTime.split(':').map(Number);
+  const [endHour, endMin] = endTime.split(':').map(Number);
+  
+  let current = startHour * 60 + startMin;
+  const end = endHour * 60 + endMin;
+  
+  while (current < end) {
+    const currentHour = Math.floor(current / 60);
+    const currentMin = current % 60;
+    const nextMinutes = current + durationMins;
+    const nextHour = Math.floor(nextMinutes / 60);
+    const nextMin = nextMinutes % 60;
+    
+    slots.push({
+      startTime: `${String(currentHour).padStart(2, '0')}:${String(currentMin).padStart(2, '0')}`,
+      endTime: `${String(nextHour).padStart(2, '0')}:${String(nextMin).padStart(2, '0')}`
+    });
+    
+    current = nextMinutes;
+  }
+  return slots;
+};
+
+const getDoctorAvailability = async (doctorId, date) => {
+  const doctor = await Doctor.findById(doctorId);
+  if (!doctor) throw Object.assign(new Error("Doctor not found."), { statusCode: 404 });
+
+  // Parse date safely (ISO format: YYYY-MM-DD) using UTC to avoid timezone issues
+  const [year, month, day] = date.split('-').map(Number);
+  const dateObj = new Date(Date.UTC(year, month - 1, day));
+  const dayName = dateObj.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
+  
+  console.log(`[SLOTS DEBUG] Date: ${date}, Parsed: Y=${year} M=${month} D=${day}, DayName: ${dayName}, DoctorID: ${doctorId}`);
+  console.log(`[SLOTS DEBUG] Doctor availability array:`, doctor.availability?.map(a => ({ day: a.day, isAvailable: a.isAvailable, slotsCount: a.slots?.length })));
+
+  // Create default availability if not set
+  let availability = doctor.availability;
+  if (!availability || availability.length === 0) {
+    const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    availability = days.map(d => ({
+      day: d,
+      isAvailable: true,
+      slots: generateSlots("09:00", "17:00", 30)
+    }));
+    logger.info(`[SLOTS] Using default 7-day availability for Doctor ${doctorId}`);
+  }
+
+  let daySchedule = availability.find((a) => a.day === dayName);
+
+  // If the doctor has a schedule but this specific day is missing, default to available with slots
+  if (!daySchedule) {
+    logger.info(`[SLOTS] Day ${dayName} not found in doctor schedule, using fallback slots`);
+    daySchedule = {
+      day: dayName,
+      isAvailable: true,
+      slots: generateSlots("09:00", "17:00", 30)
+    };
+  }
+
+  if (!daySchedule.isAvailable) return { available: false, slots: [] };
+
+  // Get booked slots for this date using UTC
+  const startOfDay = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+  const endOfDay = new Date(Date.UTC(year, month - 1, day, 23, 59, 59));
 
   const booked = await Appointment.find({
-    doctorId,
-    date,
-    status: { $in: ["pending", "confirmed"] },
+    doctor: doctorId,
+    date: {
+      $gte: startOfDay,
+      $lte: endOfDay,
+    },
+    status: { $nin: ["cancelled", "rescheduled"] },
   }).select("timeSlot");
 
   const bookedSlots = booked.map((a) => a.timeSlot);
-  return allSlots.filter((s) => !bookedSlots.includes(s));
+
+  const now = new Date();
+  const isToday = dateObj.getUTCFullYear() === now.getFullYear() &&
+    dateObj.getUTCMonth() === now.getMonth() &&
+    dateObj.getUTCDate() === now.getDate();
+
+  const slots = (daySchedule.slots || []).map((slot) => {
+    const isBooked = bookedSlots.includes(`${slot.startTime} - ${slot.endTime}`);
+    let isPast = false;
+
+    if (isToday) {
+      const [hour, minute] = slot.startTime.split(':').map(Number);
+      const slotTime = new Date();
+      slotTime.setHours(hour, minute, 0, 0);
+      if (slotTime < now) isPast = true;
+    }
+
+    return {
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      isBooked: isBooked || isPast,
+    };
+  });
+
+  return { available: true, day: dayName, slots };
 };
 
-/**
- * Cancel appointment
- */
-export const cancelAppointment = async (appointmentId, userId) => {
-  const appointment = await Appointment.findById(appointmentId);
-  if (!appointment) throw new Error("Appointment not found");
-  if (appointment.patientId.toString() !== userId.toString()) {
-    throw new Error("Not authorized to cancel this appointment");
-  }
-  if (appointment.status === "completed") {
-    throw new Error("Cannot cancel a completed appointment");
-  }
-
-  appointment.status = "cancelled";
-  await appointment.save();
-  return appointment;
-};
-
-/**
- * Update appointment status (doctor/admin)
- */
-export const updateAppointmentStatus = async (appointmentId, status, notes) => {
-  const appointment = await Appointment.findByIdAndUpdate(
-    appointmentId,
-    { status, ...(notes && { notes }) },
-    { new: true }
-  );
-  if (!appointment) throw new Error("Appointment not found");
-  return appointment;
-};
+module.exports = { bookAppointment, cancelAppointment, rescheduleAppointment, getDoctorAvailability, generateSlots };

@@ -1,89 +1,62 @@
-/**
- * appointmentReminder.job.js
- * Cron job — runs every day at 8:00 AM
- * Sends reminders for appointments scheduled for tomorrow
- */
-
 const cron = require("node-cron");
-const Appointment = require("../models/appointment.model");
-const User = require("../models/user.model");
-const { sendNotification } = require("../sockets/notification.socket");
-const { createNotification } = require("../utils/notification.util");
+const Appointment = require("../models/Appointment.model");
+const { createNotification } = require("../services/notification.service");
+const { sendAppointmentReminder } = require("../services/whatsapp.service");
+const logger = require("../utils/logger");
 
-// Helper: get tomorrow's date range (midnight → 11:59 PM)
-const getTomorrowRange = () => {
-  const start = new Date();
-  start.setDate(start.getDate() + 1);
-  start.setHours(0, 0, 0, 0);
-
-  const end = new Date(start);
-  end.setHours(23, 59, 59, 999);
-
-  return { start, end };
-};
-
-const sendAppointmentReminders = async () => {
+// Runs every day at 8 AM — sends reminders for tomorrow's appointments
+const appointmentReminderJob = cron.schedule("0 8 * * *", async () => {
+  logger.info("Running appointment reminder job...");
   try {
-    const { start, end } = getTomorrowRange();
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+
+    const dayAfter = new Date(tomorrow);
+    dayAfter.setDate(dayAfter.getDate() + 1);
 
     const appointments = await Appointment.find({
-      date: { $gte: start, $lte: end },
-      status: { $in: ["confirmed", "pending"] },
+      date: { $gte: tomorrow, $lt: dayAfter },
+      status: "confirmed",
+      reminderSent: false,
     })
-      .populate("patient", "name email _id")
-      .populate("doctor", "name _id");
+      .populate({ path: "patient", populate: { path: "user", select: "name phone email notificationPreferences" } })
+      .populate({ path: "doctor", populate: { path: "user", select: "name" } });
 
-    if (!appointments.length) {
-      console.log("[AppointmentReminder] No appointments tomorrow.");
-      return;
-    }
-
-    console.log(`[AppointmentReminder] Sending ${appointments.length} reminder(s)...`);
+    logger.info(`Found ${appointments.length} appointment reminders to send`);
 
     for (const appt of appointments) {
+      const patient = appt.patient;
+      if (!patient?.user) continue;
+
       try {
-        const timeStr = appt.timeSlot || appt.time || "your scheduled time";
-        const doctorName = appt.doctor?.name || "your doctor";
-        const patientId = appt.patient?._id?.toString();
-
-        if (!patientId) continue;
-
-        // Save to DB
         await createNotification({
-          userId: patientId,
-          title: "Appointment Reminder",
-          message: `You have an appointment with Dr. ${doctorName} tomorrow at ${timeStr}.`,
+          userId: patient.user._id,
+          title: "Appointment Tomorrow 📅",
+          message: `Reminder: You have an appointment with Dr. ${appt.doctor?.user?.name} tomorrow at ${appt.timeSlot}.`,
           type: "appointment",
+          priority: "medium",
+          data: { appointmentId: appt._id },
         });
 
-        // Real-time push
-        sendNotification(patientId, {
-          title: "Appointment Reminder",
-          message: `You have an appointment with Dr. ${doctorName} tomorrow at ${timeStr}.`,
-          type: "appointment",
-        });
+        if (patient.user.notificationPreferences?.whatsapp && patient.user.phone) {
+          await sendAppointmentReminder(patient.user.phone, {
+            doctorName: appt.doctor?.user?.name || "your doctor",
+            date: appt.date.toLocaleDateString(),
+            time: appt.timeSlot,
+            type: appt.type,
+          });
+        }
 
-        console.log(`[AppointmentReminder] Reminded patient: ${appt.patient?.name}`);
-      } catch (innerErr) {
-        console.error(`[AppointmentReminder] Error for appointment ${appt._id}:`, innerErr.message);
+        appt.reminderSent = true;
+        await appt.save();
+      } catch (err) {
+        logger.error(`Appointment reminder failed for ${appt._id}: ${err.message}`);
       }
     }
   } catch (err) {
-    console.error("[AppointmentReminder] Job failed:", err.message);
+    logger.error(`Appointment reminder job error: ${err.message}`);
   }
-};
+}, { scheduled: false });
 
-/**
- * Schedule: every day at 8:00 AM
- * Change cron expression to test: "* * * * *" = every minute
- */
-const scheduleAppointmentReminders = () => {
-  cron.schedule("0 8 * * *", async () => {
-    console.log(`[AppointmentReminder] Running at ${new Date().toISOString()}`);
-    await sendAppointmentReminders();
-  });
-
-  console.log("[AppointmentReminder] Job scheduled — daily at 8:00 AM");
-};
-
-module.exports = { scheduleAppointmentReminders, sendAppointmentReminders };
+module.exports = appointmentReminderJob;

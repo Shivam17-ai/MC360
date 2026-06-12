@@ -1,35 +1,42 @@
-import mongoose from 'mongoose'
+const mongoose = require("mongoose");
 
-const medicineItemSchema = new mongoose.Schema({
-  name:         { type: String, required: true },
-  dose:         { type: String },
-  frequency:    { type: String },
-  duration:     { type: String },
-  instructions: { type: String },
-}, { _id: false })
-
-const prescriptionSchema = new mongoose.Schema({
-  doctor: {
-    type:     mongoose.Schema.Types.ObjectId,
-    ref:      'Doctor',
-    required: true,
+const prescriptionSchema = new mongoose.Schema(
+  {
+    prescriptionId: { type: String, unique: true },
+    patient: { type: mongoose.Schema.Types.ObjectId, ref: "Patient", required: true },
+    doctor: { type: mongoose.Schema.Types.ObjectId, ref: "Doctor", required: true },
+    appointment: { type: mongoose.Schema.Types.ObjectId, ref: "Appointment" },
+    hospital: { type: mongoose.Schema.Types.ObjectId, ref: "Hospital" },
+    diagnosis: { type: String },
+    medicines: [
+      {
+        name: { type: String, required: true },
+        genericName: String,
+        dosage: String,        // "500mg"
+        frequency: String,     // "1-0-1"
+        duration: String,      // "7 days"
+        instructions: String,  // "after meals"
+        quantity: Number,
+      },
+    ],
+    tests: [String],
+    advice: { type: String },
+    followUpDate: { type: Date },
+    isDigital: { type: Boolean, default: true },
+    fileUrl: { type: String },
+    filePublicId: String,
+    isActive: { type: Boolean, default: true },
+    validUntil: { type: Date },
   },
-  patient: {
-    type:     mongoose.Schema.Types.ObjectId,
-    ref:      'User',
-    required: true,
-  },
-  appointment: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref:  'Appointment',
-  },
+  { timestamps: true }
+);
 
-  diagnosis:    { type: String },
-  medicines:    [medicineItemSchema],
-  notes:        { type: String },
-  followUpDate: { type: Date },
+prescriptionSchema.pre("save", async function (next) {
+  if (!this.prescriptionId) {
+    const count = await mongoose.model("Prescription").countDocuments();
+    this.prescriptionId = `MC360-RX-${String(count + 1).padStart(6, "0")}`;
+  }
+  next();
+});
 
-  isActive: { type: Boolean, default: true },
-}, { timestamps: true })
-
-export default mongoose.model('Prescription', prescriptionSchema)
+module.exports = mongoose.model("Prescription", prescriptionSchema);

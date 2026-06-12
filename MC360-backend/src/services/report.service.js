@@ -1,85 +1,62 @@
-import Report from "../models/Report.model.js";
-import { uploadToCloudinary, deleteFromCloudinary } from "../config/cloudinary.js";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import env from "../config/env.js";
+const Report = require("../models/Report.model");
+const { uploadToCloudinary, deleteFromCloudinary } = require("../middlewares/upload.middleware");
+const { extractTextFromBuffer } = require("./ocr.service");
+const { summarizeReport } = require("./ai.service");
+const logger = require("../utils/logger");
 
-const genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
-
-/**
- * Upload report file and create DB record
- */
-export const uploadReport = async ({ patientId, doctorId, title, type, fileBuffer, mimetype }) => {
+const uploadReport = async (patientId, uploadedBy, file, metadata) => {
+  // Upload to Cloudinary
   const folder = `mc360/reports/${patientId}`;
-  const resourceType = mimetype === "application/pdf" ? "raw" : "image";
-
-  const uploaded = await uploadToCloudinary(fileBuffer, folder, resourceType);
+  const resourceType = file.mimetype === "application/pdf" ? "raw" : "image";
+  const cloudResult = await uploadToCloudinary(file.buffer, folder, resourceType);
 
   const report = await Report.create({
-    patientId,
-    doctorId,
-    title,
-    type,
-    fileUrl: uploaded.secure_url,
-    cloudinaryPublicId: uploaded.public_id,
+    patient: patientId,
+    uploadedBy,
+    title: metadata.title || file.originalname,
+    type: metadata.type || "other",
+    fileUrl: cloudResult.secure_url,
+    filePublicId: cloudResult.public_id,
+    fileType: file.mimetype,
+    fileSize: file.size,
+    description: metadata.description,
+    date: metadata.date || new Date(),
+    tags: metadata.tags ? metadata.tags.split(",").map((t) => t.trim()) : [],
+    doctor: metadata.doctorId,
+    hospital: metadata.hospitalId,
   });
 
   return report;
 };
 
-/**
- * Get all reports for a patient
- */
-export const getReports = async (patientId, filters = {}) => {
-  const query = { patientId, isDeleted: false };
-  if (filters.type) query.type = filters.type;
+const deleteReport = async (reportId, userId) => {
+  const report = await Report.findById(reportId);
+  if (!report) throw Object.assign(new Error("Report not found."), { statusCode: 404 });
 
-  return await Report.find(query)
-    .populate("doctorId", "name specialization")
-    .sort({ uploadedAt: -1 });
-};
+  if (report.filePublicId) {
+    await deleteFromCloudinary(report.filePublicId, "raw").catch(() => {});
+  }
 
-/**
- * Soft delete a report
- */
-export const deleteReport = async (reportId, patientId) => {
-  const report = await Report.findOne({ _id: reportId, patientId });
-  if (!report) throw new Error("Report not found");
-
-  await deleteFromCloudinary(report.cloudinaryPublicId);
   report.isDeleted = true;
   await report.save();
-
-  return { message: "Report deleted" };
 };
 
-/**
- * Generate AI summary of a report using Gemini
- */
-export const generateReportSummary = async (reportId, reportText) => {
+const aiSummarizeReport = async (reportId) => {
   const report = await Report.findById(reportId);
-  if (!report) throw new Error("Report not found");
+  if (!report) throw Object.assign(new Error("Report not found."), { statusCode: 404 });
 
-  const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+  let text = "";
+  if (report.fileUrl) {
+    text = await extractTextFromBuffer(report.fileUrl);
+  }
 
-  const prompt = `
-    You are a medical AI assistant. Analyze this lab/medical report and provide:
-    1. Key Findings (bullet points)
-    2. Abnormal Values (list values outside normal range)
-    3. Risk Indicators (any concerning patterns)
-    4. Follow-up Suggestions (what the patient should do next)
+  if (!text) throw Object.assign(new Error("Could not extract text from report."), { statusCode: 422 });
 
-    Keep it clear, concise, and in simple English for a non-medical patient.
-
-    Report Content:
-    ${reportText}
-  `;
-
-  const result  = await model.generateContent(prompt);
-  const summary = result.response.text();
-
-  // Save summary to report
-  report.aiSummary = summary;
+  const summary = await summarizeReport(text, report.type);
+  report.aiSummary = summary.summary;
   await report.save();
 
-  return { summary, reportId };
+  return summary;
 };
+
+module.exports = { uploadReport, deleteReport, aiSummarizeReport };

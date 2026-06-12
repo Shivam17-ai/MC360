@@ -1,36 +1,33 @@
-import mongoose from 'mongoose'
+const mongoose = require("mongoose");
 
-const queueTokenSchema = new mongoose.Schema({
-  patient: {
-    type:     mongoose.Schema.Types.ObjectId,
-    ref:      'User',
-    required: true,
+const queueTokenSchema = new mongoose.Schema(
+  {
+    tokenNumber: { type: Number, required: true },
+    tokenDisplay: { type: String }, // "A-023"
+    patient: { type: mongoose.Schema.Types.ObjectId, ref: "Patient", required: true },
+    doctor: { type: mongoose.Schema.Types.ObjectId, ref: "Doctor" },
+    hospital: { type: mongoose.Schema.Types.ObjectId, ref: "Hospital" },
+    appointment: { type: mongoose.Schema.Types.ObjectId, ref: "Appointment" },
+    type: {
+      type: String,
+      enum: ["appointment", "walk-in", "emergency"],
+      default: "appointment",
+    },
+    status: {
+      type: String,
+      enum: ["waiting", "called", "in-progress", "done", "skipped", "cancelled"],
+      default: "waiting",
+    },
+    estimatedWaitTime: Number, // minutes
+    calledAt: Date,
+    startedAt: Date,
+    completedAt: Date,
+    date: { type: Date, default: Date.now },
+    position: { type: Number },
   },
-  doctor: {
-    type:     mongoose.Schema.Types.ObjectId,
-    ref:      'Doctor',
-    required: true,
-  },
-  hospital: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref:  'Hospital',
-  },
+  { timestamps: true }
+);
 
-  department:  { type: String },
-  tokenNumber: { type: Number, required: true },
-  tokenCode:   { type: String, required: true }, // 'A-042'
+queueTokenSchema.index({ hospital: 1, doctor: 1, date: 1, status: 1 });
 
-  status: {
-    type:    String,
-    enum:    ['waiting', 'called', 'completed', 'skipped'],
-    default: 'waiting',
-  },
-
-  calledAt:    { type: Date },
-  completedAt: { type: Date },
-  notes:       { type: String },
-}, { timestamps: true })
-
-queueTokenSchema.index({ doctor: 1, tokenNumber: 1, createdAt: -1 })
-
-export default mongoose.model('QueueToken', queueTokenSchema)
+module.exports = mongoose.model("QueueToken", queueTokenSchema);
