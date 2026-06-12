@@ -1,137 +1,104 @@
-import { useState } from "react";
-import DoctorLayout from "../../layouts/DoctorLayout";
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { prescriptionService } from '../../services/prescriptionService'
+import api from '../../services/api'
+import { Plus, FileText, Download } from 'lucide-react'
+import Avatar from '../../components/common/Avatar'
+import Badge from '../../components/common/Badge'
+import Button from '../../components/common/Button'
+import Modal from '../../components/common/Modal'
+import Input from '../../components/common/Input'
+import { formatDate } from '../../utils/formatDate'
+import toast from 'react-hot-toast'
 
-const samplePrescriptions = [
-  { id: 1, patient: "Aarav Sharma", date: "2025-07-20", medicines: ["Amlodipine 5mg OD", "Telmisartan 40mg OD"], notes: "Reduce salt intake. Follow up in 1 month." },
-  { id: 2, patient: "Priya Mehta", date: "2025-07-15", medicines: ["Paracetamol 500mg TDS", "Cetirizine 10mg OD"], notes: "Rest for 3 days. Drink fluids." },
-  { id: 3, patient: "Rohan Das", date: "2025-07-10", medicines: ["Metformin 500mg BD", "Glimepiride 1mg OD"], notes: "Monitor blood glucose daily." },
-];
+export default function Prescriptions() {
+  const qc = useQueryClient()
+  const [modal, setModal] = useState(false)
+  const [form, setForm] = useState({ patientId: '', diagnosis: '', medicines: [{ name: '', dosage: '', duration: '', instructions: '' }], advice: '' })
 
-const emptyForm = { patient: "", medicines: [""], notes: "", date: new Date().toISOString().split("T")[0] };
+  const { data, isLoading } = useQuery({
+    queryKey: ['prescriptions'],
+    queryFn: () => api.get('/prescriptions').then(r => r.data || []),
+  })
 
-const Prescriptions = ({ user }) => {
-  const [prescriptions, setPrescriptions] = useState(samplePrescriptions);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+  const create = useMutation({
+    mutationFn: (data) => prescriptionService.create(data),
+    onSuccess: () => {
+      qc.invalidateQueries(['prescriptions'])
+      toast.success('Prescription created')
+      setModal(false)
+      setForm({ patientId: '', diagnosis: '', medicines: [{ name: '', dosage: '', duration: '', instructions: '' }], advice: '' })
+    },
+    onError: e => toast.error(e.response?.data?.message || e.message),
+  })
 
-  const addMedicineField = () => setForm({ ...form, medicines: [...form.medicines, ""] });
-
-  const updateMedicine = (i, val) => {
-    const updated = [...form.medicines];
-    updated[i] = val;
-    setForm({ ...form, medicines: updated });
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setPrescriptions([{ id: Date.now(), ...form }, ...prescriptions]);
-    setForm(emptyForm);
-    setShowForm(false);
-  };
+  const addMed = () => setForm(p => ({ ...p, medicines: [...p.medicines, { name: '', dosage: '', duration: '', instructions: '' }] }))
+  const updateMed = (i, field, val) => setForm(p => ({ ...p, medicines: p.medicines.map((m, idx) => idx === i ? { ...m, [field]: val } : m) }))
 
   return (
-    <DoctorLayout user={user}>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-800">Prescriptions</h1>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-blue-700 transition"
-          >
-            + New Prescription
-          </button>
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="section-title">Prescriptions</h1>
+          <p className="section-subtitle">Create and manage digital prescriptions</p>
         </div>
+        <Button onClick={() => setModal(true)}><Plus className="w-4 h-4" /> New Prescription</Button>
+      </div>
 
-        {/* New Prescription Form */}
-        {showForm && (
-          <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm p-6 space-y-4 border border-blue-100">
-            <h2 className="font-bold text-gray-700">New Prescription</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-semibold text-gray-500 block mb-1">Patient Name</label>
-                <input
-                  type="text"
-                  value={form.patient}
-                  onChange={(e) => setForm({ ...form, patient: e.target.value })}
-                  className="border rounded-xl px-4 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  required
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-gray-500 block mb-1">Date</label>
-                <input
-                  type="date"
-                  value={form.date}
-                  onChange={(e) => setForm({ ...form, date: e.target.value })}
-                  className="border rounded-xl px-4 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-400"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-gray-500 block mb-2">Medicines</label>
-              {form.medicines.map((m, i) => (
-                <input
-                  key={i}
-                  type="text"
-                  value={m}
-                  onChange={(e) => updateMedicine(i, e.target.value)}
-                  placeholder={`Medicine ${i + 1} (e.g. Paracetamol 500mg TDS)`}
-                  className="border rounded-xl px-4 py-2 text-sm w-full mb-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                />
-              ))}
-              <button type="button" onClick={addMedicineField} className="text-xs text-blue-600 font-semibold hover:underline">
-                + Add Another Medicine
-              </button>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-gray-500 block mb-1">Notes / Instructions</label>
-              <textarea
-                value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                rows={3}
-                className="border rounded-xl px-4 py-2 text-sm w-full resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
-            </div>
-            <div className="flex gap-3">
-              <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded-xl text-sm font-semibold hover:bg-blue-700 transition">Save</button>
-              <button type="button" onClick={() => setShowForm(false)} className="border border-gray-300 px-6 py-2 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition">Cancel</button>
-            </div>
-          </form>
-        )}
-
-        {/* Prescriptions List */}
-        <div className="space-y-4">
-          {prescriptions.map((p) => (
-            <div key={p.id} className="bg-white rounded-2xl shadow-sm p-5 border border-gray-100">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <p className="font-bold text-gray-800">{p.patient}</p>
-                  <p className="text-xs text-gray-400">{p.date}</p>
+      <div className="space-y-3">
+        {isLoading ? Array.from({ length: 3 }).map((_, i) => <div key={i} className="card p-5 space-y-2"><div className="skeleton h-4 w-1/3" /><div className="skeleton h-3 w-1/2" /></div>) :
+          (data || []).map(rx => (
+            <div key={rx._id} className="card p-5 flex items-start gap-4">
+              <Avatar name={rx.patient?.user?.name || rx.patient?.name} size="md" />
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-slate-900">{rx.patient?.user?.name || rx.patient?.name || 'Unknown Patient'}</h3>
+                <p className="text-sm text-slate-500 mt-0.5">{rx.diagnosis}</p>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {rx.medicines?.slice(0, 3).map((m, i) => <Badge key={i} variant="blue">{m.name}</Badge>)}
+                  {rx.medicines?.length > 3 && <Badge variant="gray">+{rx.medicines.length - 3} more</Badge>}
                 </div>
-                <button className="text-xs text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition font-semibold">
-                  📄 Download PDF
-                </button>
+                <p className="text-xs text-slate-400 mt-2">{formatDate(rx.createdAt)}</p>
               </div>
-              <div className="mb-2">
-                <p className="text-xs font-semibold text-gray-500 mb-1">Medicines:</p>
-                <ul className="space-y-1">
-                  {p.medicines.map((m, i) => (
-                    <li key={i} className="text-sm text-gray-700 flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 text-xs flex items-center justify-center font-bold">{i + 1}</span>
-                      {m}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              {p.notes && (
-                <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 mt-2">📝 {p.notes}</p>
-              )}
+              <Button size="sm" variant="secondary" onClick={() => prescriptionService.download(rx._id)}><Download className="w-3.5 h-3.5" /></Button>
             </div>
           ))}
-        </div>
       </div>
-    </DoctorLayout>
-  );
-};
 
-export default Prescriptions;
+      <Modal isOpen={modal} onClose={() => setModal(false)} title="New Prescription" size="lg">
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+          <div className="bg-primary-50/50 border border-primary-100 p-3 rounded-xl">
+            <p className="text-xs text-primary-700 leading-relaxed">
+              <strong>Prescription Policy:</strong> A full diagnosis is mandatory for the first prescription. Subsequent refills can omit the diagnosis if the patient has had a check-up within the last 90 days.
+            </p>
+          </div>
+          <Input label="Patient ID" placeholder="Patient's ID" value={form.patientId} onChange={e => setForm(p => ({ ...p, patientId: e.target.value }))} />
+          <Input label="Diagnosis" placeholder="e.g. Type 2 Diabetes" value={form.diagnosis} onChange={e => setForm(p => ({ ...p, diagnosis: e.target.value }))} />
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="label-base mb-0">Medicines</label>
+              <button onClick={addMed} className="text-xs text-primary-600 font-medium hover:underline flex items-center gap-1"><Plus className="w-3 h-3" />Add</button>
+            </div>
+            <div className="space-y-3">
+              {form.medicines.map((m, i) => (
+                <div key={i} className="grid grid-cols-2 gap-2 p-3 bg-surface-50 rounded-xl">
+                  <Input placeholder="Medicine name" value={m.name} onChange={e => updateMed(i, 'name', e.target.value)} />
+                  <Input placeholder="Dosage (e.g. 500mg)" value={m.dosage} onChange={e => updateMed(i, 'dosage', e.target.value)} />
+                  <Input placeholder="Duration (e.g. 7 days)" value={m.duration} onChange={e => updateMed(i, 'duration', e.target.value)} />
+                  <Input placeholder="Instructions (after meals…)" value={m.instructions} onChange={e => updateMed(i, 'instructions', e.target.value)} />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="label-base">Additional Advice</label>
+            <textarea rows={2} className="input-base resize-none" placeholder="Any additional advice…" value={form.advice} onChange={e => setForm(p => ({ ...p, advice: e.target.value }))} />
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="secondary" onClick={() => setModal(false)}>Cancel</Button>
+            <Button loading={create.isPending} onClick={() => create.mutate(form)}>Create Prescription</Button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  )
+}

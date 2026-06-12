@@ -1,91 +1,60 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from 'react-router-dom'
+import { Activity, LogOut } from 'lucide-react'
+import { useAuthStore } from '../../store/authStore'
+import Avatar from '../common/Avatar'
+import { clsx } from 'clsx'
 
-const patientLinks = [
-  { to: "/patient/dashboard", icon: "🏠", label: "Dashboard" },
-  { to: "/patient/appointments", icon: "📅", label: "Appointments" },
-  { to: "/patient/book", icon: "➕", label: "Book Appointment" },
-  { to: "/patient/reports", icon: "📋", label: "My Reports" },
-  { to: "/patient/medicines", icon: "💊", label: "Medicine Tracker" },
-  { to: "/patient/analytics", icon: "📊", label: "Health Analytics" },
-  { to: "/patient/symptom-checker", icon: "🤖", label: "Symptom Checker" },
-  { to: "/patient/diet", icon: "🥗", label: "Diet Planner" },
-  { to: "/patient/profile", icon: "👤", label: "Profile" },
-];
+export default function Sidebar({ navItems }) {
+  const { user, logout } = useAuthStore()
+  const navigate = useNavigate()
 
-const doctorLinks = [
-  { to: "/doctor/dashboard", icon: "🏠", label: "Dashboard" },
-  { to: "/doctor/appointments", icon: "📅", label: "Appointments" },
-  { to: "/doctor/patients", icon: "🧑‍⚕️", label: "Patient Records" },
-  { to: "/doctor/prescriptions", icon: "📝", label: "Prescriptions" },
-  { to: "/doctor/video", icon: "🎥", label: "Video Consult" },
-  { to: "/doctor/profile", icon: "👤", label: "Profile" },
-];
-
-const hospitalLinks = [
-  { to: "/hospital/dashboard", icon: "🏥", label: "Dashboard" },
-  { to: "/hospital/doctors", icon: "👨‍⚕️", label: "Manage Doctors" },
-  { to: "/hospital/patients", icon: "🧑‍🤝‍🧑", label: "Manage Patients" },
-  { to: "/hospital/analytics", icon: "📊", label: "Analytics" },
-  { to: "/hospital/emergency", icon: "🚨", label: "Emergency Monitor" },
-];
-
-const roleLinks = { patient: patientLinks, doctor: doctorLinks, hospital_admin: hospitalLinks };
-
-const Sidebar = ({ role = "patient", isOpen = true, onClose }) => {
-  const links = roleLinks[role] || patientLinks;
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
+  }
 
   return (
-    <>
-      {/* Overlay for mobile */}
-      {isOpen && (
-        <div className="fixed inset-0 bg-black/30 z-30 md:hidden" onClick={onClose} />
-      )}
-
-      <aside className={`fixed top-0 left-0 h-full w-64 bg-white shadow-xl z-40 transform transition-transform duration-300
-        ${isOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 md:static md:shadow-none md:z-auto`}>
-
-        {/* Logo */}
-        <div className="flex items-center gap-2 px-6 py-5 border-b border-gray-100">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">M</div>
-          <span className="text-base font-bold text-blue-700">MedConnect<span className="text-gray-800">360</span></span>
+    <aside className="w-64 shrink-0 h-screen sticky top-0 flex flex-col bg-white border-r border-surface-200">
+      {/* Logo */}
+      <div className="px-5 h-16 flex items-center gap-2.5 border-b border-surface-200 shrink-0">
+        <div className="w-8 h-8 bg-gradient-to-br from-primary-600 to-teal-500 rounded-lg flex items-center justify-center">
+          <Activity className="w-4 h-4 text-white" />
         </div>
+        <span className="text-lg font-semibold text-slate-900">MC<span className="text-gradient">360</span></span>
+      </div>
 
-        {/* Role Badge */}
-        <div className="px-6 py-3">
-          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
-            {role === "hospital_admin" ? "Hospital Admin" : role}
-          </span>
+      {/* Nav */}
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto no-scrollbar">
+        {navItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.end}
+            className={({ isActive }) => clsx(isActive ? 'nav-link-active' : 'nav-link')}
+          >
+            <item.icon className="w-4.5 h-4.5 shrink-0" style={{ width: '18px', height: '18px' }} />
+            {item.label}
+            {item.badge && (
+              <span className="ml-auto badge-red py-0.5">{item.badge}</span>
+            )}
+          </NavLink>
+        ))}
+      </nav>
+
+      {/* User */}
+      <div className="p-4 border-t border-surface-200">
+        <div className="flex items-center gap-3 mb-3">
+          <Avatar name={user?.name} src={user?.avatar} size="sm" />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-slate-900 truncate">{user?.name}</p>
+            <p className="text-xs text-slate-400 truncate">{user?.email}</p>
+          </div>
         </div>
-
-        {/* Nav Links */}
-        <nav className="px-3 space-y-1 overflow-y-auto">
-          {links.map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              onClick={onClose}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition
-                ${isActive
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "text-gray-600 hover:bg-blue-50 hover:text-blue-600"}`
-              }
-            >
-              <span className="text-base">{link.icon}</span>
-              {link.label}
-            </NavLink>
-          ))}
-        </nav>
-
-        {/* Bottom Logout */}
-        <div className="absolute bottom-0 left-0 right-0 px-3 py-4 border-t border-gray-100">
-          <button className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 w-full transition">
-            <span>🚪</span> Logout
-          </button>
-        </div>
-      </aside>
-    </>
-  );
-};
-
-export default Sidebar;
+        <button onClick={handleLogout} className="nav-link w-full text-red-500 hover:bg-red-50 hover:text-red-600">
+          <LogOut className="w-4 h-4" />
+          Sign out
+        </button>
+      </div>
+    </aside>
+  )
+}

@@ -1,20 +1,14 @@
-import { useNavigate } from "react-router-dom";
-import DashboardLayout from "../components/layout/DashboardLayout";
+import { LayoutDashboard, Calendar, Users, FileText, Video, User } from 'lucide-react'
+import DashboardLayout from '../components/layout/DashboardLayout'
 
-const DoctorLayout = ({ children, user }) => {
-  const navigate = useNavigate();
+const navItems = [
+  { to: '/doctor/dashboard', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/doctor/appointments', label: 'Appointments', icon: Calendar },
+  { to: '/doctor/patients', label: 'Patient Records', icon: Users },
+  { to: '/doctor/prescriptions', label: 'Prescriptions', icon: FileText },
+  { to: '/doctor/profile', label: 'Profile', icon: User },
+]
 
-  const doctorUser = user || {
-    name: "Doctor User",
-    role: "doctor",
-    email: "doctor@example.com",
-  };
-
-  return (
-    <DashboardLayout role="doctor" user={doctorUser}>
-      {children}
-    </DashboardLayout>
-  );
-};
-
-export default DoctorLayout;
+export default function DoctorLayout() {
+  return <DashboardLayout navItems={navItems} />
+}

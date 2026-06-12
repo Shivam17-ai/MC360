@@ -1,72 +1,86 @@
-import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { create } from 'zustand'
+import { authService } from '../services/authService'
+import { storage } from '../utils/storage'
 
-const useAuthStore = create(
-  persist(
-    (set, get) => ({
-      // ── State ──────────────────────────────────────────────────────
-      user: null,
-      token: null,
-      refreshToken: null,
-      isAuthenticated: false,
-      isLoading: false,
-      error: null,
+export const useAuthStore = create((set, get) => ({
+  user: storage.get('user'),
+  token: storage.get('token'),
+  isLoading: false,
+  isInitialized: false,
+  isAuthenticated: !!storage.get('token'),
 
-      // ── Actions ────────────────────────────────────────────────────
-
-      setLoading: (val) => set({ isLoading: val }),
-
-      setError: (msg) => set({ error: msg }),
-
-      clearError: () => set({ error: null }),
-
-      login: (user, token, refreshToken) =>
-        set({
-          user,
-          token,
-          refreshToken,
-          isAuthenticated: true,
-          isLoading: false,
-          error: null,
-        }),
-
-      logout: () =>
-        set({
-          user: null,
-          token: null,
-          refreshToken: null,
-          isAuthenticated: false,
-          isLoading: false,
-          error: null,
-        }),
-
-      updateUser: (updatedFields) =>
-        set((state) => ({
-          user: { ...state.user, ...updatedFields },
-        })),
-
-      setToken: (token) => set({ token }),
-
-      // ── Selectors ──────────────────────────────────────────────────
-
-      getRole: () => get().user?.role || null,
-
-      isPatient: () => get().user?.role === "patient",
-
-      isDoctor: () => get().user?.role === "doctor",
-
-      isHospitalAdmin: () => get().user?.role === "hospital_admin",
-    }),
-    {
-      name: "mc360-auth",           // localStorage key
-      partialize: (state) => ({     // only persist these fields
-        user: state.user,
-        token: state.token,
-        refreshToken: state.refreshToken,
-        isAuthenticated: state.isAuthenticated,
-      }),
+  checkAuth: async () => {
+    const token = storage.get('token')
+    const user = storage.get('user')
+    
+    if (token && user) {
+      // Sync state with storage immediately if not already set
+      if (!get().isAuthenticated) {
+        set({ token, user, isAuthenticated: true })
+      }
+      try {
+        const fresh = await authService.getMe()
+        set({ user: fresh.data, isAuthenticated: true, isInitialized: true })
+        storage.set('user', fresh.data)
+      } catch (err) {
+        console.error("Auth check failed:", err)
+        get().logout()
+      }
+    } else {
+      set({ isAuthenticated: false, isInitialized: true })
     }
-  )
-);
+  },
 
-export default useAuthStore;
+  login: async (credentials) => {
+    set({ isLoading: true })
+    try {
+      const res = await authService.login(credentials)
+      storage.set('token', res.data.accessToken)
+      storage.set('user', res.data.user)
+      set({ user: res.data.user, token: res.data.accessToken, isAuthenticated: true, isLoading: false, isInitialized: true })
+      return res.data
+    } catch (err) {
+      set({ isLoading: false })
+      throw err
+    }
+  },
+
+  register: async (data) => {
+    set({ isLoading: true })
+    try {
+      const res = await authService.register(data)
+      storage.set('token', res.data.accessToken)
+      storage.set('user', res.data.user)
+      set({ user: res.data.user, token: res.data.accessToken, isAuthenticated: true, isLoading: false, isInitialized: true })
+      return res.data
+    } catch (err) {
+      set({ isLoading: false })
+      throw err
+    }
+  },
+
+  googleLogin: async (token) => {
+    set({ isLoading: true })
+    try {
+      const res = await authService.googleLogin(token)
+      storage.set('token', res.data.accessToken)
+      storage.set('user', res.data.user)
+      set({ user: res.data.user, token: res.data.accessToken, isAuthenticated: true, isLoading: false, isInitialized: true })
+      return res.data
+    } catch (err) {
+      set({ isLoading: false })
+      throw err
+    }
+  },
+
+  logout: () => {
+    storage.clear()
+    set({ user: null, token: null, isAuthenticated: false })
+  },
+
+  updateUser: (data) => {
+    const user = { ...get().user, ...data }
+    storage.set('user', user)
+    set({ user })
+  },
+}))

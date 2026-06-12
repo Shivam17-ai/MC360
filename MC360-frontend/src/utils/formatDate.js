@@ -1,53 +1,33 @@
 import { format, formatDistanceToNow, isToday, isYesterday, parseISO } from 'date-fns'
 
-// Format: Jan 5, 2025
-export const formatDate = (date) => {
+export const formatDate = (date, fmt = 'dd MMM yyyy') => {
   if (!date) return '—'
-  return format(new Date(date), 'MMM d, yyyy')
+  const d = typeof date === 'string' ? parseISO(date) : date
+  return format(d, fmt)
 }
 
-// Format: Jan 5, 2025 · 10:30 AM
 export const formatDateTime = (date) => {
   if (!date) return '—'
-  return format(new Date(date), 'MMM d, yyyy · hh:mm a')
+  const d = typeof date === 'string' ? parseISO(date) : date
+  return format(d, 'dd MMM yyyy, hh:mm a')
 }
 
-// Format: 10:30 AM
 export const formatTime = (date) => {
   if (!date) return '—'
-  return format(new Date(date), 'hh:mm a')
+  const d = typeof date === 'string' ? parseISO(date) : date
+  return format(d, 'hh:mm a')
 }
 
-// Format: 2 hours ago / yesterday / Jan 5
 export const timeAgo = (date) => {
   if (!date) return '—'
-  const d = new Date(date)
-  if (isToday(d))     return formatDistanceToNow(d, { addSuffix: true })
-  if (isYesterday(d)) return 'Yesterday'
-  return formatDate(d)
+  const d = typeof date === 'string' ? parseISO(date) : date
+  return formatDistanceToNow(d, { addSuffix: true })
 }
 
-// Format: Monday, January 5
-export const formatFullDate = (date) => {
+export const smartDate = (date) => {
   if (!date) return '—'
-  return format(new Date(date), 'EEEE, MMMM d')
-}
-
-// Format: 05/01/2025
-export const formatShortDate = (date) => {
-  if (!date) return '—'
-  return format(new Date(date), 'dd/MM/yyyy')
-}
-
-// Parse ISO string safely
-export const parseDate = (isoString) => {
-  if (!isoString) return null
-  return parseISO(isoString)
-}
-
-// Get age from DOB
-export const getAge = (dob) => {
-  if (!dob) return '—'
-  const diff = Date.now() - new Date(dob).getTime()
-  return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25))
+  const d = typeof date === 'string' ? parseISO(date) : date
+  if (isToday(d)) return `Today, ${format(d, 'hh:mm a')}`
+  if (isYesterday(d)) return `Yesterday, ${format(d, 'hh:mm a')}`
+  return format(d, 'dd MMM yyyy')
 }

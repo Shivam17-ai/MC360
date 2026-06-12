@@ -1,46 +1,110 @@
-import { useState } from "react";
+import { useState } from 'react'
+import { Activity } from 'lucide-react'
+import Button from '../common/Button'
+import Input from '../common/Input'
 
-const fields = [
-  { name: "age", label: "Age", type: "number" },
-  { name: "weight", label: "Weight (kg)", type: "number" },
-  { name: "height", label: "Height (cm)", type: "number" },
-  { name: "bloodPressure", label: "Blood Pressure (mmHg)", type: "text" },
-  { name: "glucoseLevel", label: "Glucose Level (mg/dL)", type: "number" },
-  { name: "cholesterol", label: "Cholesterol (mg/dL)", type: "number" },
-];
+const RISK_TYPES = [
+  { value: 'diabetes', label: 'Diabetes' },
+  { value: 'heart', label: 'Heart Disease' },
+  { value: 'obesity', label: 'Obesity' },
+]
 
-const RiskPredictionForm = ({ onSubmit }) => {
-  const [form, setForm] = useState({});
+export default function RiskPredictionForm({ onSubmit, loading }) {
+  const [riskType, setRiskType] = useState('diabetes')
+  const [form, setForm] = useState({
+    age: '', bmi: '', glucose: '', bloodPressure: '',
+    cholesterol: '', smoking: 'no', physicalActivity: 'moderate',
+  })
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (onSubmit) onSubmit(form);
-  };
+  const set = (k, v) => setForm((p) => ({ ...p, [k]: v }))
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white p-6 rounded-2xl shadow-md max-w-lg space-y-4">
-      <h2 className="text-xl font-bold text-blue-700">Health Risk Prediction</h2>
-      <div className="grid grid-cols-2 gap-4">
-        {fields.map((f) => (
-          <div key={f.name}>
-            <label className="text-xs font-semibold text-gray-600 block mb-1">{f.label}</label>
-            <input
-              type={f.type}
-              name={f.name}
-              onChange={handleChange}
-              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              required
-            />
-          </div>
-        ))}
+    <div className="space-y-5">
+      <div>
+        <label className="label-base">Risk Type</label>
+        <div className="flex gap-2">
+          {RISK_TYPES.map((t) => (
+            <button
+              key={t.value}
+              onClick={() => setRiskType(t.value)}
+              className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-all ${
+                riskType === t.value
+                  ? 'bg-primary-600 text-white border-primary-600'
+                  : 'border-surface-200 text-slate-600 hover:border-slate-300'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
-      <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition">
-        Predict Risk
-      </button>
-    </form>
-  );
-};
 
-export default RiskPredictionForm;
+      <div className="grid grid-cols-2 gap-4">
+        <Input
+          label="Age"
+          type="number"
+          placeholder="e.g. 45"
+          value={form.age}
+          onChange={(e) => set('age', e.target.value)}
+        />
+        <Input
+          label="BMI"
+          type="number"
+          step="0.1"
+          placeholder="e.g. 24.5"
+          value={form.bmi}
+          onChange={(e) => set('bmi', e.target.value)}
+        />
+        <Input
+          label="Fasting Glucose (mg/dL)"
+          type="number"
+          placeholder="e.g. 95"
+          value={form.glucose}
+          onChange={(e) => set('glucose', e.target.value)}
+        />
+        <Input
+          label="Blood Pressure (systolic)"
+          type="number"
+          placeholder="e.g. 120"
+          value={form.bloodPressure}
+          onChange={(e) => set('bloodPressure', e.target.value)}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="label-base">Smoking</label>
+          <select
+            value={form.smoking}
+            onChange={(e) => set('smoking', e.target.value)}
+            className="input-base"
+          >
+            <option value="no">Non-smoker</option>
+            <option value="yes">Smoker</option>
+            <option value="former">Former smoker</option>
+          </select>
+        </div>
+        <div>
+          <label className="label-base">Physical Activity</label>
+          <select
+            value={form.physicalActivity}
+            onChange={(e) => set('physicalActivity', e.target.value)}
+            className="input-base"
+          >
+            <option value="low">Low</option>
+            <option value="moderate">Moderate</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+      </div>
+
+      <Button
+        className="w-full justify-center"
+        loading={loading}
+        onClick={() => onSubmit({ ...form, riskType })}
+      >
+        <Activity className="w-4 h-4" /> Predict Risk
+      </Button>
+    </div>
+  )
+}

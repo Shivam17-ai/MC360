@@ -1,74 +1,135 @@
 import { useState } from 'react'
-import Card from '../../components/common/Card'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { appointmentService } from '../../services/appointmentService'
+import { formatDate, formatTime } from '../../utils/formatDate'
+import { getStatusColor } from '../../utils/helpers'
+import { Calendar, Video, User, X, Clock } from 'lucide-react'
 import Badge from '../../components/common/Badge'
 import Button from '../../components/common/Button'
-import EmptyState from '../../components/common/EmptyState'
-import { Calendar, Clock, Video } from 'lucide-react'
+import Avatar from '../../components/common/Avatar'
+import Modal from '../../components/common/Modal'
+import toast from 'react-hot-toast'
+import { useNavigate } from 'react-router-dom'
+import { APPOINTMENT_STATUS } from '../../utils/constants'
 
-const appointments = [
-  { id: 1, doctor: 'Dr. Rahul Mehta',  specialization: 'Cardiologist',      date: 'Dec 18, 2024', time: '3:00 PM',  type: 'video',    status: 'confirmed' },
-  { id: 2, doctor: 'Dr. Priya Singh',  specialization: 'Dermatologist',     date: 'Dec 19, 2024', time: '11:00 AM', type: 'in-person', status: 'pending' },
-  { id: 3, doctor: 'Dr. Anil Kumar',   specialization: 'General Physician', date: 'Dec 10, 2024', time: '9:00 AM',  type: 'in-person', status: 'completed' },
-  { id: 4, doctor: 'Dr. Sneha Patel',  specialization: 'Gynecologist',      date: 'Nov 28, 2024', time: '2:00 PM',  type: 'video',    status: 'cancelled' },
-]
+const TABS = ['upcoming', 'completed', 'cancelled']
 
-const tabs    = ['All', 'Upcoming', 'Completed', 'Cancelled']
-const statusColors = { confirmed: 'green', pending: 'amber', completed: 'blue', cancelled: 'red' }
+// Map UI tab names to the actual DB status values
+const TAB_STATUS_MAP = {
+  upcoming: 'confirmed',
+  completed: 'completed',
+  cancelled: 'cancelled',
+}
 
 export default function MyAppointments() {
-  const [tab, setTab] = useState('All')
+  const [activeTab, setActiveTab] = useState('upcoming')
+  const [cancelId, setCancelId] = useState(null)
+  const qc = useQueryClient()
+  const navigate = useNavigate()
 
-  const filtered = appointments.filter((a) => {
-    if (tab === 'Upcoming')  return ['confirmed', 'pending'].includes(a.status)
-    if (tab === 'Completed') return a.status === 'completed'
-    if (tab === 'Cancelled') return a.status === 'cancelled'
-    return true
+  const { data, isLoading } = useQuery({
+    queryKey: ['appointments', activeTab],
+    queryFn: () => appointmentService.getAll({ status: TAB_STATUS_MAP[activeTab] }).then(r => r.data),
   })
 
+  const cancel = useMutation({
+    mutationFn: (id) => appointmentService.cancel(id),
+    onSuccess: () => {
+      toast.success('Appointment cancelled')
+      qc.invalidateQueries(['appointments'])
+      setCancelId(null)
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
+  const appointments = data || []
+
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-display font-bold text-slate-800">My Appointments</h1>
+    <div className="space-y-6 animate-fade-in">
+      <div>
+        <h1 className="section-title">My Appointments</h1>
+        <p className="section-subtitle">Manage all your past and upcoming consultations</p>
+      </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 flex-wrap">
-        {tabs.map((t) => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${tab === t ? 'bg-primary-600 text-white' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'}`}>
-            {t}
+      <div className="flex gap-1 bg-surface-100 rounded-xl p-1 w-fit">
+        {TABS.map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-all ${activeTab === tab ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            {tab}
           </button>
         ))}
       </div>
 
-      {filtered.length === 0 ? (
-        <EmptyState title="No appointments found" description="Book an appointment to get started." />
-      ) : (
-        <div className="space-y-4">
-          {filtered.map((appt) => (
-            <Card key={appt.id} className="flex items-center justify-between gap-4 flex-wrap">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-primary-100 text-primary-700 font-bold flex items-center justify-center">
-                  {appt.doctor.split(' ')[1][0]}
-                </div>
-                <div>
-                  <p className="font-semibold text-slate-800">{appt.doctor}</p>
-                  <p className="text-xs text-slate-400">{appt.specialization}</p>
-                  <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
-                    <span className="flex items-center gap-1"><Calendar size={12} />{appt.date}</span>
-                    <span className="flex items-center gap-1"><Clock size={12} />{appt.time}</span>
-                    <span className="flex items-center gap-1"><Video size={12} />{appt.type}</span>
-                  </div>
+      {/* List */}
+      <div className="space-y-3">
+        {isLoading ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="card p-5">
+              <div className="flex gap-4">
+                <div className="skeleton w-12 h-12 rounded-xl" />
+                <div className="flex-1 space-y-2">
+                  <div className="skeleton h-4 w-1/3" />
+                  <div className="skeleton h-3 w-1/2" />
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <Badge variant={statusColors[appt.status]}>{appt.status}</Badge>
-                {appt.type === 'video' && appt.status === 'confirmed' && (
-                  <Button size="sm">Join Call</Button>
+            </div>
+          ))
+        ) : appointments.length === 0 ? (
+          <div className="card p-16 text-center">
+            <Calendar className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+            <p className="text-slate-400">No {activeTab} appointments</p>
+          </div>
+        ) : (
+          appointments.map(appt => (
+            <div key={appt._id} className="card p-5">
+              <div className="flex items-start gap-4">
+                <Avatar name={appt.doctor?.user?.name} src={appt.doctor?.user?.avatar} size="md" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="font-semibold text-slate-900">{appt.doctor?.user?.name || 'Doctor'}</h3>
+                      <p className="text-sm text-slate-500">{appt.doctor?.specialization}</p>
+                    </div>
+                    <Badge variant={appt.status === 'confirmed' ? 'green' : appt.status === 'completed' ? 'blue' : appt.status === 'cancelled' ? 'red' : 'yellow'}>
+                      {appt.status === 'confirmed' ? 'upcoming' : appt.status}
+                    </Badge>
+                  </div>
+                  <div className="flex flex-wrap gap-4 mt-2 text-xs text-slate-500">
+                    <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{formatDate(appt.date)}</span>
+                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{appt.timeSlot}</span>
+                    <span className="flex items-center gap-1">{appt.type === 'telemedicine' ? <Video className="w-3 h-3" /> : <User className="w-3 h-3" />}{appt.type}</span>
+                  </div>
+                  {appt.reason && <p className="text-xs text-slate-400 mt-2 bg-surface-50 rounded-lg px-3 py-1.5">Reason: {appt.reason}</p>}
+                </div>
+                {appt.status === 'confirmed' && (
+                  <div className="flex gap-2 shrink-0">
+                    {appt.type === 'telemedicine' && (
+                      <Button size="sm" onClick={() => navigate(`/patient/video/${appt._id}`)}>
+                        <Video className="w-3.5 h-3.5" /> Join
+                      </Button>
+                    )}
+                    <Button size="sm" variant="secondary" onClick={() => setCancelId(appt._id)}>
+                      <X className="w-3.5 h-3.5" /> Cancel
+                    </Button>
+                  </div>
                 )}
               </div>
-            </Card>
-          ))}
+            </div>
+          ))
+        )}
+      </div>
+
+      <Modal isOpen={!!cancelId} onClose={() => setCancelId(null)} title="Cancel Appointment" size="sm">
+        <p className="text-sm text-slate-600 mb-5">Are you sure you want to cancel this appointment? This action cannot be undone.</p>
+        <div className="flex justify-end gap-3">
+          <Button variant="secondary" onClick={() => setCancelId(null)}>Keep it</Button>
+          <Button variant="danger" loading={cancel.isPending} onClick={() => cancel.mutate(cancelId)}>Yes, Cancel</Button>
         </div>
-      )}
+      </Modal>
     </div>
   )
 }

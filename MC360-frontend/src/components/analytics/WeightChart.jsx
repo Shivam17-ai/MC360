@@ -1,33 +1,43 @@
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer,
+} from 'recharts'
 
-const sampleData = [
-  { date: "Jan", weight: 75 },
-  { date: "Feb", weight: 74 },
-  { date: "Mar", weight: 72 },
-  { date: "Apr", weight: 71 },
-  { date: "May", weight: 70 },
-  { date: "Jun", weight: 69 },
-];
-
-const WeightChart = ({ data = sampleData }) => (
-  <div className="bg-white p-6 rounded-2xl shadow-md">
-    <h3 className="text-lg font-bold text-blue-700 mb-4">Weight Tracker (kg)</h3>
-    <ResponsiveContainer width="100%" height={220}>
+export default function WeightChart({ data }) {
+  return (
+    <ResponsiveContainer width="100%" height={200}>
       <AreaChart data={data}>
         <defs>
-          <linearGradient id="weightGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+          <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="#2a85ff" stopOpacity={0.15} />
+            <stop offset="95%" stopColor="#2a85ff" stopOpacity={0} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="date" />
-        <YAxis domain={["auto", "auto"]} />
-        <Tooltip />
-        <Area type="monotone" dataKey="weight" stroke="#3b82f6" fill="url(#weightGrad)" strokeWidth={2} />
+        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+        <XAxis
+          dataKey="date"
+          tick={{ fontSize: 11, fill: '#94a3b8' }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <YAxis
+          tick={{ fontSize: 11, fill: '#94a3b8' }}
+          axisLine={false}
+          tickLine={false}
+          unit=" kg"
+        />
+        <Tooltip
+          contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+          formatter={(v) => [`${v} kg`, 'Weight']}
+        />
+        <Area
+          type="monotone"
+          dataKey="value"
+          stroke="#2a85ff"
+          strokeWidth={2}
+          fill="url(#weightGradient)"
+        />
       </AreaChart>
     </ResponsiveContainer>
-  </div>
-);
-
-export default WeightChart;
+  )
+}

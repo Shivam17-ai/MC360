@@ -1,30 +1,52 @@
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, ResponsiveContainer,
+} from 'recharts'
 
-const sampleData = [
-  { month: "Jan", weight: 72, bp: 120, glucose: 95 },
-  { month: "Feb", weight: 71, bp: 118, glucose: 98 },
-  { month: "Mar", weight: 70, bp: 122, glucose: 92 },
-  { month: "Apr", weight: 69, bp: 115, glucose: 90 },
-  { month: "May", weight: 68, bp: 117, glucose: 88 },
-  { month: "Jun", weight: 68, bp: 119, glucose: 91 },
-];
+export default function HealthTrendsChart({ data, metrics }) {
+  const COLORS = ['#2a85ff', '#14b8a6', '#f59e0b', '#ef4444', '#8b5cf6']
 
-const HealthTrendsChart = ({ data = sampleData }) => (
-  <div className="bg-white p-6 rounded-2xl shadow-md">
-    <h3 className="text-lg font-bold text-blue-700 mb-4">Health Trends</h3>
-    <ResponsiveContainer width="100%" height={250}>
-      <LineChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="month" />
-        <YAxis />
-        <Tooltip />
-        <Legend />
-        <Line type="monotone" dataKey="weight" stroke="#3b82f6" strokeWidth={2} dot={false} />
-        <Line type="monotone" dataKey="bp" stroke="#10b981" strokeWidth={2} dot={false} />
-        <Line type="monotone" dataKey="glucose" stroke="#f59e0b" strokeWidth={2} dot={false} />
+  return (
+    <ResponsiveContainer width="100%" height={260}>
+      <LineChart data={data} margin={{ top: 4, right: 4, left: -10, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+        <XAxis
+          dataKey="date"
+          tick={{ fontSize: 11, fill: '#94a3b8' }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <YAxis
+          tick={{ fontSize: 11, fill: '#94a3b8' }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <Tooltip
+          contentStyle={{
+            fontSize: 12,
+            borderRadius: 8,
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.08)',
+          }}
+        />
+        <Legend
+          wrapperStyle={{ fontSize: 12 }}
+          iconType="circle"
+          iconSize={8}
+        />
+        {metrics.map((m, i) => (
+          <Line
+            key={m.key}
+            type="monotone"
+            dataKey={m.key}
+            name={m.label}
+            stroke={COLORS[i % COLORS.length]}
+            strokeWidth={2}
+            dot={{ r: 3, fill: COLORS[i % COLORS.length] }}
+            activeDot={{ r: 5 }}
+          />
+        ))}
       </LineChart>
     </ResponsiveContainer>
-  </div>
-);
-
-export default HealthTrendsChart;
+  )
+}

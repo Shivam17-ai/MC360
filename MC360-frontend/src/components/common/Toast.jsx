@@ -1,15 +1,12 @@
-import { Toaster } from 'react-hot-toast'
+// Re-export from react-hot-toast for convenience
+export { toast as Toast, Toaster } from 'react-hot-toast'
+import toast from 'react-hot-toast'
 
-export default function Toast() {
-  return (
-    <Toaster
-      position="top-right"
-      toastOptions={{
-        duration: 4000,
-        style: { borderRadius: '12px', fontSize: '14px' },
-        success: { iconTheme: { primary: '#22c55e', secondary: '#fff' } },
-        error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
-      }}
-    />
-  )
+export const showToast = {
+  success: (msg) => toast.success(msg),
+  error: (msg) => toast.error(msg),
+  loading: (msg) => toast.loading(msg),
+  dismiss: (id) => toast.dismiss(id),
 }
+
+export default showToast

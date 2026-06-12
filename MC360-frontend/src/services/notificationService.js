@@ -1,17 +1,8 @@
-import api from "./api";
+import api from './api'
 
-const notificationService = {
-  getNotifications: (params) => api.get("/notifications", { params }),
-
-  markAsRead: (id) => api.patch(`/notifications/${id}/read`),
-
-  markAllAsRead: () => api.patch("/notifications/mark-all-read"),
-
-  deleteNotification: (id) => api.delete(`/notifications/${id}`),
-
-  deleteAllRead: () => api.delete("/notifications/read"),
-
-  getUnreadCount: () => api.get("/notifications/unread-count"),
-};
-
-export default notificationService;
+export const notificationService = {
+  getAll: () => api.get('/notifications'),
+  markRead: (id) => api.patch(`/notifications/${id}/read`),
+  markAllRead: () => api.patch('/notifications/read-all'),
+  delete: (id) => api.delete(`/notifications/${id}`),
+}

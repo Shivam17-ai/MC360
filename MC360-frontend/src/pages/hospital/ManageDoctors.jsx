@@ -1,235 +1,107 @@
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import api from '../../services/api'
+import { Plus, Search, Trash2, UserCheck } from 'lucide-react'
+import Avatar from '../../components/common/Avatar'
+import Badge from '../../components/common/Badge'
+import Button from '../../components/common/Button'
+import Modal from '../../components/common/Modal'
+import Input from '../../components/common/Input'
+import { SPECIALIZATIONS } from '../../utils/constants'
+import toast from 'react-hot-toast'
 
-import { useState, useEffect } from "react";
-import { Plus, Search, Edit2, Trash2, UserCheck, UserX, Phone, Mail } from "lucide-react";
-import api from "../../services/api";
-import Button from "../../components/common/Button";
-import SkeletonLoader from "../../components/common/SkeletonLoader";
-import Badge from "../../components/common/Badge";
-import EmptyState from "../../components/common/EmptyState";
-import Modal from "../../components/common/Modal";
-import Toast from "../../components/common/Toast";
-import useDebounce from "../../hooks/useDebounce";
+export default function ManageDoctors() {
+  const qc = useQueryClient()
+  const [search, setSearch] = useState('')
+  const [modal, setModal] = useState(false)
+  const [form, setForm] = useState({ name: '', email: '', specialization: '', experience: '', phone: '' })
 
-const ManageDoctors = () => {
-  const [doctors, setDoctors] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [deleteId, setDeleteId] = useState(null);
-  const [toast, setToast] = useState(null);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const { data, isLoading } = useQuery({
+    queryKey: ['hospital-doctors', search],
+    queryFn: () => api.get('/hospital/doctors', { params: { search } }).then(r => r.data),
+  })
 
-  const debouncedSearch = useDebounce(search, 400);
+  const addDoctor = useMutation({
+    mutationFn: (d) => api.post('/hospital/doctors', d),
+    onSuccess: () => { qc.invalidateQueries(['hospital-doctors']); toast.success('Doctor added'); setModal(false) },
+    onError: e => toast.error(e.message),
+  })
 
-  const fetchDoctors = async () => {
-    setLoading(true);
-    try {
-      const res = await api.get("/hospital/doctors", {
-        params: { search: debouncedSearch, page, limit: 10 },
-      });
-      setDoctors(res.doctors || res || []);
-      setTotalPages(res.totalPages || 1);
-    } catch (err) {
-      showToast(err.message || "Failed to load doctors", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchDoctors();
-  }, [debouncedSearch, page]);
-
-  const showToast = (message, type = "success") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
-
-  const handleToggleStatus = async (doctor) => {
-    try {
-      const updated = await api.patch(`/hospital/doctors/${doctor._id}/toggle-status`);
-      setDoctors((prev) =>
-        prev.map((d) => (d._id === doctor._id ? { ...d, isActive: updated.isActive } : d))
-      );
-      showToast(`Dr. ${doctor.name} ${updated.isActive ? "activated" : "deactivated"}.`);
-    } catch (err) {
-      showToast(err.message || "Failed to update status.", "error");
-    }
-  };
-
-  const handleDelete = async () => {
-    try {
-      await api.delete(`/hospital/doctors/${deleteId}`);
-      setDoctors((prev) => prev.filter((d) => d._id !== deleteId));
-      showToast("Doctor removed successfully.");
-    } catch (err) {
-      showToast(err.message || "Failed to delete doctor.", "error");
-    } finally {
-      setDeleteId(null);
-    }
-  };
+  const removeDoctor = useMutation({
+    mutationFn: (id) => api.delete(`/hospital/doctors/${id}`),
+    onSuccess: () => { qc.invalidateQueries(['hospital-doctors']); toast.success('Doctor removed') },
+  })
 
   return (
-    <div className="space-y-6">
-      {toast && <Toast message={toast.message} type={toast.type} />}
-
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Manage Doctors</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {doctors.length} doctor{doctors.length !== 1 ? "s" : ""} registered
-          </p>
+          <h1 className="section-title">Manage Doctors</h1>
+          <p className="section-subtitle">Add, view, and manage hospital doctors</p>
         </div>
-        <Button
-          onClick={() => window.location.href = "/hospital/doctors/add"}
-          className="flex items-center gap-2"
-        >
-          <Plus size={16} /> Add Doctor
-        </Button>
+        <Button onClick={() => setModal(true)}><Plus className="w-4 h-4" /> Add Doctor</Button>
       </div>
 
-      {/* Search */}
-      <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-4 py-2.5 w-full max-w-sm shadow-sm">
-        <Search size={16} className="text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search by name or specialization..."
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          className="flex-1 text-sm text-gray-700 outline-none bg-transparent placeholder-gray-400"
-        />
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search doctors…" className="input-base pl-9 max-w-sm" />
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="p-6 space-y-3">
-            {[...Array(5)].map((_, i) => <SkeletonLoader key={i} className="h-14 rounded-xl" />)}
-          </div>
-        ) : doctors.length === 0 ? (
-          <EmptyState
-            icon={<UserCheck size={36} />}
-            title="No doctors found"
-            description="Add doctors to get started."
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  {["Doctor", "Specialization", "Contact", "Patients", "Status", "Actions"].map((h) => (
-                    <th key={h} className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-5 py-3">
-                      {h}
-                    </th>
-                  ))}
+      <div className="card overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-surface-200 bg-surface-50">
+              {['Doctor', 'Specialization', 'Experience', 'Status', ''].map(h => (
+                <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-surface-100">
+            {isLoading ? Array.from({ length: 5 }).map((_, i) => <tr key={i}>{Array.from({ length: 5 }).map((_, j) => <td key={j} className="px-4 py-3"><div className="skeleton h-4 rounded" /></td>)}</tr>)
+              : (data || []).map(doc => (
+                <tr key={doc._id} className="hover:bg-surface-50 transition-colors">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <Avatar name={doc.name} size="sm" />
+                      <div>
+                        <p className="font-medium text-slate-900">{doc.name}</p>
+                        <p className="text-xs text-slate-400">{doc.email}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">{doc.specialization || '—'}</td>
+                  <td className="px-4 py-3 text-slate-600">{doc.experience ? `${doc.experience} yrs` : '—'}</td>
+                  <td className="px-4 py-3"><Badge variant={doc.isActive ? 'green' : 'gray'} dot>{doc.isActive ? 'Active' : 'Inactive'}</Badge></td>
+                  <td className="px-4 py-3">
+                    <button onClick={() => removeDoctor.mutate(doc._id)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {doctors.map((doctor) => (
-                  <tr key={doctor._id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-semibold text-sm shrink-0">
-                          {doctor.name?.charAt(0)?.toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-800">Dr. {doctor.name}</p>
-                          <p className="text-xs text-gray-400">{doctor.qualification || "MBBS"}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4 text-gray-600">{doctor.specialization || "—"}</td>
-                    <td className="px-5 py-4">
-                      <div className="space-y-0.5">
-                        <p className="flex items-center gap-1 text-xs text-gray-500">
-                          <Mail size={11} /> {doctor.email || "—"}
-                        </p>
-                        <p className="flex items-center gap-1 text-xs text-gray-500">
-                          <Phone size={11} /> {doctor.phone || "—"}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="px-5 py-4 text-gray-600">{doctor.totalPatients ?? "—"}</td>
-                    <td className="px-5 py-4">
-                      <Badge variant={doctor.isActive ? "success" : "danger"}>
-                        {doctor.isActive ? "Active" : "Inactive"}
-                      </Badge>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleToggleStatus(doctor)}
-                          title={doctor.isActive ? "Deactivate" : "Activate"}
-                          className={`p-1.5 rounded-lg transition-colors ${
-                            doctor.isActive
-                              ? "text-red-400 hover:bg-red-50 hover:text-red-600"
-                              : "text-green-400 hover:bg-green-50 hover:text-green-600"
-                          }`}
-                        >
-                          {doctor.isActive ? <UserX size={15} /> : <UserCheck size={15} />}
-                        </button>
-                        <button
-                          onClick={() => window.location.href = `/hospital/doctors/edit/${doctor._id}`}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Edit"
-                        >
-                          <Edit2 size={15} />
-                        </button>
-                        <button
-                          onClick={() => setDeleteId(doctor._id)}
-                          className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+              ))}
+          </tbody>
+        </table>
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center gap-2">
-          {[...Array(totalPages)].map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setPage(i + 1)}
-              className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
-                page === i + 1
-                  ? "bg-blue-600 text-white"
-                  : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              {i + 1}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Confirm delete modal */}
-      <Modal
-        isOpen={!!deleteId}
-        onClose={() => setDeleteId(null)}
-        title="Remove Doctor"
-        footer={
-          <div className="flex gap-3 justify-end">
-            <Button variant="secondary" onClick={() => setDeleteId(null)}>Cancel</Button>
-            <Button variant="danger" onClick={handleDelete}>Remove</Button>
+      <Modal isOpen={modal} onClose={() => setModal(false)} title="Add Doctor">
+        <div className="space-y-4">
+          <Input label="Full Name" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
+          <Input label="Email" type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} />
+          <Input label="Phone" value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} />
+          <div>
+            <label className="label-base">Specialization</label>
+            <select value={form.specialization} onChange={e => setForm(p => ({ ...p, specialization: e.target.value }))} className="input-base">
+              <option value="">Select…</option>
+              {SPECIALIZATIONS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
           </div>
-        }
-      >
-        <p className="text-sm text-gray-600">
-          Are you sure you want to remove this doctor? This action cannot be undone.
-        </p>
+          <Input label="Experience (years)" type="number" value={form.experience} onChange={e => setForm(p => ({ ...p, experience: e.target.value }))} />
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => setModal(false)}>Cancel</Button>
+            <Button loading={addDoctor.isPending} onClick={() => addDoctor.mutate(form)}>Add Doctor</Button>
+          </div>
+        </div>
       </Modal>
     </div>
-  );
-};
-
-export default ManageDoctors;
+  )
+}

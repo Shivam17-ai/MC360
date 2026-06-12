@@ -1,44 +1,69 @@
-import { Clock, Hash } from 'lucide-react'
-import Card from '../common/Card'
+import { Clock, Users, CheckCircle2 } from 'lucide-react'
 import Badge from '../common/Badge'
 
-export default function QueueToken({ token }) {
-  const data = token || {
-    number: 'A-042',
-    department: 'Cardiology',
-    doctor: 'Dr. Rahul Mehta',
-    estimatedWait: '25 mins',
-    ahead: 4,
-    status: 'waiting',
+export default function QueueToken({ token, position, totalAhead }) {
+  if (!token) return null
+
+  const statusVariant = {
+    waiting: 'yellow',
+    in_progress: 'blue',
+    done: 'green',
+    skipped: 'gray',
   }
 
-  const statusColors = { waiting: 'amber', called: 'green', completed: 'blue', skipped: 'red' }
-
   return (
-    <Card className="max-w-sm mx-auto text-center space-y-4">
-      <p className="text-xs text-slate-500 uppercase tracking-widest">Your Token</p>
-      <div className="w-24 h-24 rounded-full bg-primary-50 border-4 border-primary-200 flex items-center justify-center mx-auto">
-        <span className="text-2xl font-display font-bold text-primary-700">{data.number}</span>
+    <div className="card p-6 text-center space-y-4">
+      <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
+        Your Queue Token
+      </p>
+
+      <div className="w-24 h-24 bg-primary-50 rounded-3xl flex items-center justify-center mx-auto">
+        <span className="text-4xl font-bold text-primary-700 font-mono">
+          {token.tokenNumber}
+        </span>
       </div>
+
       <div>
-        <p className="font-display font-semibold text-slate-800">{data.doctor}</p>
-        <p className="text-sm text-slate-400">{data.department}</p>
+        <Badge
+          variant={statusVariant[token.status] || 'gray'}
+          dot
+          className="text-sm px-3 py-1"
+        >
+          {token.status?.replace(/_/g, ' ')}
+        </Badge>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-slate-50 rounded-xl p-3">
-          <p className="text-xs text-slate-400">Estimated Wait</p>
-          <p className="font-semibold text-slate-800 flex items-center justify-center gap-1 mt-1">
-            <Clock size={14} /> {data.estimatedWait}
+
+      {token.status === 'waiting' && (
+        <div className="grid grid-cols-2 gap-4 pt-2">
+          <div className="bg-surface-50 rounded-xl p-3">
+            <Users className="w-4 h-4 text-slate-400 mx-auto mb-1" />
+            <p className="text-xl font-bold text-slate-900">{totalAhead || 0}</p>
+            <p className="text-xs text-slate-400">ahead of you</p>
+          </div>
+          <div className="bg-surface-50 rounded-xl p-3">
+            <Clock className="w-4 h-4 text-slate-400 mx-auto mb-1" />
+            <p className="text-xl font-bold text-slate-900">
+              ~{(totalAhead || 0) * 10}
+            </p>
+            <p className="text-xs text-slate-400">mins wait</p>
+          </div>
+        </div>
+      )}
+
+      {token.status === 'in_progress' && (
+        <div className="p-4 bg-primary-50 border border-primary-200 rounded-xl">
+          <p className="text-primary-700 font-semibold text-sm">
+            It's your turn! Please proceed.
           </p>
         </div>
-        <div className="bg-slate-50 rounded-xl p-3">
-          <p className="text-xs text-slate-400">Ahead of You</p>
-          <p className="font-semibold text-slate-800 flex items-center justify-center gap-1 mt-1">
-            <Hash size={14} /> {data.ahead}
-          </p>
+      )}
+
+      {token.status === 'done' && (
+        <div className="flex items-center justify-center gap-2 text-emerald-600">
+          <CheckCircle2 className="w-5 h-5" />
+          <span className="font-medium">Consultation complete</span>
         </div>
-      </div>
-      <Badge variant={statusColors[data.status]} className="mx-auto capitalize">{data.status}</Badge>
-    </Card>
+      )}
+    </div>
   )
 }

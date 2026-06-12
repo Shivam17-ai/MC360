@@ -1,65 +1,44 @@
-import { Link } from "react-router-dom";
+import { Activity } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
-const Footer = () => (
-  <footer className="bg-gray-900 text-gray-300 pt-12 pb-6">
-    <div className="max-w-7xl mx-auto px-6">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
-
-        {/* Brand */}
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">M</div>
-            <span className="text-white font-bold text-lg">MedConnect<span className="text-blue-400">360</span></span>
+export default function Footer() {
+  return (
+    <footer className="bg-surface-900 text-slate-400 py-16 px-6">
+      <div className="max-w-7xl mx-auto">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+          <div className="col-span-2 md:col-span-1">
+            <Link to="/" className="flex items-center gap-2.5 mb-4">
+              <div className="w-8 h-8 bg-gradient-to-br from-primary-600 to-teal-500 rounded-lg flex items-center justify-center">
+                <Activity className="w-4 h-4 text-white" />
+              </div>
+              <span className="text-lg font-semibold text-white">MC360</span>
+            </Link>
+            <p className="text-sm leading-relaxed">
+              Complete healthcare management for patients, doctors, and hospitals.
+            </p>
           </div>
-          <p className="text-sm text-gray-400 leading-relaxed">
-            AI-powered smart healthcare ecosystem connecting patients, doctors, and hospitals seamlessly.
-          </p>
+          {[
+            { title: 'Product', links: ['Features', 'Services', 'Pricing', 'Changelog'] },
+            { title: 'Company', links: ['About', 'Careers', 'Blog', 'Press'] },
+            { title: 'Legal', links: ['Privacy', 'Terms', 'Cookies', 'Security'] },
+          ].map((col) => (
+            <div key={col.title}>
+              <h4 className="text-sm font-semibold text-white mb-4">{col.title}</h4>
+              <ul className="space-y-2.5">
+                {col.links.map((link) => (
+                  <li key={link}>
+                    <a href="#" className="text-sm hover:text-white transition-colors">{link}</a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
-
-        {/* Services */}
-        <div>
-          <h4 className="text-white font-semibold text-sm mb-3">Services</h4>
-          <ul className="space-y-2 text-sm text-gray-400">
-            {["Book Appointment", "Telemedicine", "AI Symptom Checker", "Medicine Tracker", "Health Analytics"].map((s) => (
-              <li key={s}><Link to="#" className="hover:text-blue-400 transition">{s}</Link></li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Company */}
-        <div>
-          <h4 className="text-white font-semibold text-sm mb-3">Company</h4>
-          <ul className="space-y-2 text-sm text-gray-400">
-            {["About Us", "Our Team", "Careers", "Privacy Policy", "Terms of Service"].map((c) => (
-              <li key={c}><Link to="#" className="hover:text-blue-400 transition">{c}</Link></li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Contact */}
-        <div>
-          <h4 className="text-white font-semibold text-sm mb-3">Contact</h4>
-          <ul className="space-y-2 text-sm text-gray-400">
-            <li>📧 support@medconnect360.com</li>
-            <li>📞 +91 98765 43210</li>
-            <li>📍 New Delhi, India</li>
-          </ul>
-          <div className="flex gap-3 mt-4">
-            {["𝕏", "in", "f", "▶"].map((icon, i) => (
-              <button key={i} className="w-8 h-8 rounded-full bg-gray-700 hover:bg-blue-600 flex items-center justify-center text-xs text-white transition">
-                {icon}
-              </button>
-            ))}
-          </div>
+        <div className="divider border-slate-800 pt-6 flex flex-col md:flex-row items-center justify-between gap-3">
+          <p className="text-xs">© 2025 MC360. All rights reserved.</p>
+          <p className="text-xs">Built with care for better healthcare.</p>
         </div>
       </div>
-
-      <div className="border-t border-gray-800 pt-5 flex flex-col md:flex-row items-center justify-between gap-2 text-xs text-gray-500">
-        <p>© {new Date().getFullYear()} MedConnect360. All rights reserved.</p>
-        <p>Built with ❤️ by Anuradha Paswan, Kriti Yadav, Shivam, Shubham Chakma</p>
-      </div>
-    </div>
-  </footer>
-);
-
-export default Footer;
+    </footer>
+  )
+}

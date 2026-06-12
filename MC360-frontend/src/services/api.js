@@ -1,41 +1,31 @@
-import axios from "axios";
-
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+import axios from 'axios'
+import { config } from '../config/env'
+import { storage } from '../utils/storage'
 
 const api = axios.create({
-  baseURL: BASE_URL,
-  headers: { "Content-Type": "application/json" },
+  baseURL: config.apiUrl,
+  headers: { 'Content-Type': 'application/json' },
   timeout: 15000,
-});
+})
 
-// ── Request interceptor: attach JWT ──────────────────────────
-api.interceptors.request.use(
-  (config) => {
-    const raw = localStorage.getItem("auth-storage");
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        const token = parsed?.state?.token;
-        if (token) config.headers.Authorization = `Bearer ${token}`;
-      } catch {}
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+api.interceptors.request.use((req) => {
+  const token = storage.get('token')
+  console.log("🚀 Token being sent to backend:", token);
+  if (token) req.headers.Authorization = `Bearer ${token}`
+  return req
+})
 
-// ── Response interceptor: handle 401 ────────────────────────
 api.interceptors.response.use(
-  (response) => response.data,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem("auth-storage");
-      window.location.href = "/login";
+  (res) => res.data,
+  (err) => {
+    const message = err.response?.data?.message || 'Something went wrong'
+    if (err.response?.status === 401) {
+      storage.remove('token')
+      storage.remove('user')
+      // Removed hard redirect to avoid refresh loops
     }
-    const message =
-      error.response?.data?.message || error.message || "Something went wrong";
-    return Promise.reject(new Error(message));
-  }
-);
+    return Promise.reject(new Error(message))
+  },
+)
 
-export default api;
+export default api

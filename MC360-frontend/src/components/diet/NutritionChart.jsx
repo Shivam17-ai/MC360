@@ -1,29 +1,42 @@
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 
-const COLORS = ['#0e8af5', '#22c55e', '#f59e0b', '#ef4444']
+const COLORS = ['#2a85ff', '#14b8a6', '#f59e0b']
 
-export default function NutritionChart({ data }) {
-  const chartData = data || [
-    { name: 'Protein', value: 25 },
-    { name: 'Carbs', value: 50 },
-    { name: 'Fats', value: 20 },
-    { name: 'Fiber', value: 5 },
-  ]
+export default function NutritionChart({ protein, carbs, fat }) {
+  const data = [
+    { name: 'Protein', value: protein || 0 },
+    { name: 'Carbs', value: carbs || 0 },
+    { name: 'Fat', value: fat || 0 },
+  ].filter((d) => d.value > 0)
+
+  if (!data.length) return null
 
   return (
-    <div className="card">
-      <h3 className="font-display font-semibold text-slate-800 mb-4">Nutrition Breakdown</h3>
-      <ResponsiveContainer width="100%" height={260}>
-        <PieChart>
-          <Pie data={chartData} cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={3} dataKey="value">
-            {chartData.map((_, i) => (
-              <Cell key={i} fill={COLORS[i % COLORS.length]} />
-            ))}
-          </Pie>
-          <Tooltip formatter={(v) => `${v}%`} />
-          <Legend />
-        </PieChart>
-      </ResponsiveContainer>
-    </div>
+    <ResponsiveContainer width="100%" height={180}>
+      <PieChart>
+        <Pie
+          data={data}
+          cx="50%"
+          cy="50%"
+          innerRadius={50}
+          outerRadius={70}
+          paddingAngle={3}
+          dataKey="value"
+        >
+          {data.map((_, i) => (
+            <Cell key={i} fill={COLORS[i % COLORS.length]} />
+          ))}
+        </Pie>
+        <Tooltip
+          contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+          formatter={(v, n) => [`${v}g`, n]}
+        />
+        <Legend
+          wrapperStyle={{ fontSize: 11 }}
+          iconType="circle"
+          iconSize={8}
+        />
+      </PieChart>
+    </ResponsiveContainer>
   )
 }

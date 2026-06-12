@@ -1,31 +1,32 @@
-import { useState } from 'react'
-import { Monitor, MonitorOff } from 'lucide-react'
-import Button from '../common/Button'
+import { useState, useCallback } from 'react'
+import { ScreenShare, ScreenShareOff } from 'lucide-react'
 
-export default function ScreenShare() {
-  const [sharing, setSharing] = useState(false)
+export default function useScreenShare(peerRef) {
+  const [isSharing, setIsSharing] = useState(false)
+  const [screenStream, setScreenStream] = useState(null)
 
-  const toggle = async () => {
-    if (!sharing) {
-      try {
-        await navigator.mediaDevices.getDisplayMedia({ video: true })
-        setSharing(true)
-      } catch {
-        setSharing(false)
+  const startShare = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true })
+      const videoTrack = stream.getVideoTracks()[0]
+      const peer = peerRef.current
+      if (peer) {
+        const sender = peer
+          .getSenders()
+          .find((s) => s.track?.kind === 'video')
+        sender?.replaceTrack(videoTrack)
       }
-    } else {
-      setSharing(false)
-    }
-  }
+      videoTrack.onended = stopShare
+      setScreenStream(stream)
+      setIsSharing(true)
+    } catch {}
+  }, [peerRef])
 
-  return (
-    <Button
-      variant={sharing ? 'danger' : 'secondary'}
-      onClick={toggle}
-      className="gap-2"
-    >
-      {sharing ? <MonitorOff size={16} /> : <Monitor size={16} />}
-      {sharing ? 'Stop Sharing' : 'Share Screen'}
-    </Button>
-  )
+  const stopShare = useCallback(() => {
+    screenStream?.getTracks().forEach((t) => t.stop())
+    setScreenStream(null)
+    setIsSharing(false)
+  }, [screenStream])
+
+  return { isSharing, startShare, stopShare }
 }

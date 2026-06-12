@@ -1,65 +1,37 @@
-import { useState } from "react";
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { registerSchema } from '../../utils/validators'
+import Input from '../common/Input'
+import Button from '../common/Button'
+import { User, Mail, Phone, Lock } from 'lucide-react'
 
-const RegisterForm = ({ onSubmit }) => {
-  const [form, setForm] = useState({ name: "", email: "", password: "", role: "patient", phone: "" });
-
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (onSubmit) onSubmit(form);
-  };
+export default function RegisterForm({ onSubmit, isLoading }) {
+  const { register, handleSubmit, formState: { errors } } = useForm({
+    resolver: zodResolver(registerSchema),
+    defaultValues: { role: 'patient' },
+  })
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md mx-auto">
-      <h2 className="text-2xl font-bold text-blue-700 mb-1">Create Account</h2>
-      <p className="text-sm text-gray-500 mb-6">Join MedConnect360 today</p>
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {[
-          { name: "name", label: "Full Name", type: "text", placeholder: "John Doe" },
-          { name: "email", label: "Email", type: "email", placeholder: "you@example.com" },
-          { name: "phone", label: "Phone Number", type: "tel", placeholder: "+91 9876543210" },
-          { name: "password", label: "Password", type: "password", placeholder: "Min 8 characters" },
-        ].map((f) => (
-          <div key={f.name}>
-            <label className="text-xs font-semibold text-gray-600 block mb-1">{f.label}</label>
-            <input
-              type={f.type}
-              name={f.name}
-              value={form[f.name]}
-              onChange={handleChange}
-              placeholder={f.placeholder}
-              className="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              required
-            />
-          </div>
-        ))}
-
-        <div>
-          <label className="text-xs font-semibold text-gray-600 block mb-1">Register As</label>
-          <select
-            name="role"
-            value={form.role}
-            onChange={handleChange}
-            className="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-          >
-            <option value="patient">Patient</option>
-            <option value="doctor">Doctor</option>
-            <option value="hospital_admin">Hospital Admin</option>
-          </select>
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <Input label="Full name" placeholder="Dr. Jane Smith" leftIcon={<User className="w-4 h-4" />} error={errors.name?.message} {...register('name')} />
+      <Input label="Email" type="email" placeholder="you@example.com" leftIcon={<Mail className="w-4 h-4" />} error={errors.email?.message} {...register('email')} />
+      <Input label="Mobile number" type="tel" placeholder="9876543210" leftIcon={<Phone className="w-4 h-4" />} error={errors.phone?.message} {...register('phone')} />
+      <Input label="Password" type="password" placeholder="Create a strong password" leftIcon={<Lock className="w-4 h-4" />} error={errors.password?.message} {...register('password')} />
+      <div>
+        <label className="label-base">I am a</label>
+        <div className="grid grid-cols-3 gap-2">
+          {[{ value: 'patient', label: 'Patient' }, { value: 'doctor', label: 'Doctor' }, { value: 'hospital', label: 'Hospital' }].map((opt) => (
+            <label key={opt.value} className="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-surface-200 cursor-pointer hover:border-primary-400 has-[:checked]:border-primary-500 has-[:checked]:bg-primary-50 transition-all">
+              <input type="radio" value={opt.value} {...register('role')} className="sr-only" />
+              <span className="text-sm font-medium text-slate-700">{opt.label}</span>
+            </label>
+          ))}
         </div>
-
-        <button type="submit" className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition">
-          Create Account
-        </button>
-      </form>
-
-      <p className="text-center text-sm text-gray-500 mt-4">
-        Already have an account? <a href="/login" className="text-blue-600 font-semibold hover:underline">Sign In</a>
-      </p>
-    </div>
-  );
-};
-
-export default RegisterForm;
+        {errors.role && <p className="mt-1.5 text-xs text-red-500">{errors.role.message}</p>}
+      </div>
+      <Button type="submit" loading={isLoading} className="w-full justify-center mt-2">
+        Create account
+      </Button>
+    </form>
+  )
+}

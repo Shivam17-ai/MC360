@@ -1,37 +1,89 @@
-const statusColors = {
-  pending: "bg-yellow-100 text-yellow-700",
-  confirmed: "bg-blue-100 text-blue-700",
-  completed: "bg-green-100 text-green-700",
-  cancelled: "bg-red-100 text-red-700",
-};
+import { Calendar, Clock, Video, User, MapPin } from 'lucide-react'
+import Avatar from '../common/Avatar'
+import Badge from '../common/Badge'
+import Button from '../common/Button'
+import { formatDate } from '../../utils/formatDate'
+import { useNavigate } from 'react-router-dom'
 
-const AppointmentCard = ({ appointment = {}, onCancel, onReschedule }) => {
-  const { doctorName = "Dr. Smith", specialization = "General", date = "2025-08-01", time = "10:00 AM", status = "confirmed", type = "consultation" } = appointment;
-  const colorClass = statusColors[status] || statusColors["pending"];
+export default function AppointmentCard({ appointment, role = 'patient', onCancel }) {
+  const navigate = useNavigate()
+  const other = role === 'patient' ? appointment.doctor : appointment.patient
+
+  const statusVariant = {
+    confirmed: 'green', pending: 'yellow', completed: 'blue', cancelled: 'red',
+  }
 
   return (
-    <div className="bg-white rounded-2xl shadow-md p-5 flex flex-col gap-3 border border-gray-100">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="font-bold text-gray-800">{doctorName}</p>
-          <p className="text-sm text-gray-500">{specialization}</p>
+    <div className="card p-5 flex flex-col gap-4">
+      <div className="flex items-start gap-3">
+        <Avatar name={other?.name} src={other?.avatar} size="md" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="font-semibold text-slate-900 truncate">{other?.name || '—'}</p>
+              <p className="text-xs text-slate-500">
+                {role === 'patient' ? other?.specialization : 'Patient'}
+              </p>
+            </div>
+            <Badge variant={statusVariant[appointment.status] || 'gray'}>
+              {appointment.status}
+            </Badge>
+          </div>
         </div>
-        <span className={`text-xs font-semibold px-3 py-1 rounded-full ${colorClass}`}>{status}</span>
       </div>
-      <div className="text-sm text-gray-600 space-y-1">
-        <p>📅 {date} &nbsp; 🕐 {time}</p>
-        <p>🏥 Type: <span className="capitalize font-medium">{type}</span></p>
-      </div>
-      <div className="flex gap-2 mt-1">
-        {status !== "cancelled" && status !== "completed" && (
-          <>
-            <button onClick={onReschedule} className="flex-1 text-sm border border-blue-500 text-blue-600 py-1.5 rounded-lg hover:bg-blue-50 transition">Reschedule</button>
-            <button onClick={onCancel} className="flex-1 text-sm border border-red-400 text-red-500 py-1.5 rounded-lg hover:bg-red-50 transition">Cancel</button>
-          </>
+
+      <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
+        <span className="flex items-center gap-1.5">
+          <Calendar className="w-3.5 h-3.5 text-primary-400" />
+          {formatDate(appointment.date)}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Clock className="w-3.5 h-3.5 text-primary-400" />
+          {appointment.slot}
+        </span>
+        <span className="flex items-center gap-1.5">
+          {appointment.mode === 'video'
+            ? <Video className="w-3.5 h-3.5 text-violet-400" />
+            : <User className="w-3.5 h-3.5 text-slate-400" />}
+          {appointment.mode === 'video' ? 'Video call' : 'In-person'}
+        </span>
+        {appointment.hospital && (
+          <span className="flex items-center gap-1.5">
+            <MapPin className="w-3.5 h-3.5 text-slate-400" />
+            <span className="truncate">{appointment.hospital}</span>
+          </span>
         )}
       </div>
-    </div>
-  );
-};
 
-export default AppointmentCard;
+      {appointment.reason && (
+        <p className="text-xs text-slate-400 bg-surface-50 rounded-lg px-3 py-2 truncate">
+          {appointment.reason}
+        </p>
+      )}
+
+      {appointment.status === 'confirmed' && (
+        <div className="flex gap-2 pt-1">
+          {appointment.mode === 'video' && (
+            <Button
+              size="sm"
+              className="flex-1 justify-center"
+              onClick={() => navigate(`/${role}/video/${appointment._id}`)}
+            >
+              <Video className="w-3.5 h-3.5" /> Join Call
+            </Button>
+          )}
+          {onCancel && (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="flex-1 justify-center text-red-500 hover:text-red-600 hover:border-red-200"
+              onClick={() => onCancel(appointment._id)}
+            >
+              Cancel
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}

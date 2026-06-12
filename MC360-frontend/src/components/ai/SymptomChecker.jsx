@@ -1,49 +1,76 @@
-import { useState } from "react";
+import { useState } from 'react'
+import { Brain, Plus, X } from 'lucide-react'
+import Button from '../common/Button'
 
-const SymptomChecker = () => {
-  const [symptoms, setSymptoms] = useState("");
-  const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
+const COMMON = [
+  'Headache', 'Fever', 'Cough', 'Fatigue', 'Nausea',
+  'Chest pain', 'Shortness of breath', 'Dizziness',
+]
 
-  const handleCheck = async () => {
-    if (!symptoms.trim()) return;
-    setLoading(true);
-    setTimeout(() => {
-      setResult({
-        triageLevel: "Moderate",
-        recommendation: "Visit a General Physician",
-        urgency: "Within 24 hours",
-      });
-      setLoading(false);
-    }, 1500);
-  };
+export default function SymptomChecker({ onAnalyze, loading }) {
+  const [symptoms, setSymptoms] = useState([])
+  const [input, setInput] = useState('')
+
+  const add = (s) => {
+    const clean = s.trim()
+    if (!clean || symptoms.includes(clean)) return
+    setSymptoms((p) => [...p, clean])
+    setInput('')
+  }
+
+  const remove = (s) => setSymptoms((p) => p.filter((x) => x !== s))
 
   return (
-    <div className="p-6 bg-white rounded-2xl shadow-md max-w-xl">
-      <h2 className="text-xl font-bold text-blue-700 mb-4">AI Symptom Checker</h2>
-      <textarea
-        className="w-full border rounded-lg p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
-        rows={4}
-        placeholder="Describe your symptoms (e.g. headache, fever, cough...)"
-        value={symptoms}
-        onChange={(e) => setSymptoms(e.target.value)}
-      />
-      <button
-        onClick={handleCheck}
-        disabled={loading}
-        className="mt-3 w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50"
-      >
-        {loading ? "Analyzing..." : "Check Symptoms"}
-      </button>
-      {result && (
-        <div className="mt-4 p-4 bg-yellow-50 border border-yellow-300 rounded-lg text-sm">
-          <p><span className="font-semibold">Triage Level:</span> {result.triageLevel}</p>
-          <p><span className="font-semibold">Recommendation:</span> {result.recommendation}</p>
-          <p><span className="font-semibold">Urgency:</span> {result.urgency}</p>
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && add(input)}
+          placeholder="Type a symptom and press Enter…"
+          className="input-base flex-1"
+        />
+        <Button onClick={() => add(input)} variant="secondary">
+          <Plus className="w-4 h-4" />
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {COMMON.filter((s) => !symptoms.includes(s)).map((s) => (
+          <button
+            key={s}
+            onClick={() => add(s)}
+            className="px-3 py-1.5 text-xs bg-surface-100 hover:bg-primary-50 hover:text-primary-700 text-slate-600 rounded-full border border-surface-200 hover:border-primary-300 transition-all"
+          >
+            + {s}
+          </button>
+        ))}
+      </div>
+
+      {symptoms.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {symptoms.map((s) => (
+            <span
+              key={s}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 text-primary-700 rounded-full text-sm border border-primary-200"
+            >
+              {s}
+              <button onClick={() => remove(s)}>
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </span>
+          ))}
         </div>
       )}
-    </div>
-  );
-};
 
-export default SymptomChecker;
+      <Button
+        className="w-full justify-center"
+        loading={loading}
+        disabled={symptoms.length === 0}
+        onClick={() => onAnalyze(symptoms)}
+      >
+        <Brain className="w-4 h-4" /> Analyze Symptoms
+      </Button>
+    </div>
+  )
+}

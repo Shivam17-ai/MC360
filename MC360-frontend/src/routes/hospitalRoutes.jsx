@@ -1,19 +1,16 @@
 import { Route } from 'react-router-dom'
-import HospitalLayout from '../layouts/HospitalLayout.jsx'
-import HospitalDashboard from '../pages/hospital/HospitalDashboard.jsx'
-import ManageDoctors from '../pages/hospital/ManageDoctors.jsx'
-import ManagePatients from '../pages/hospital/ManagePatients.jsx'
-import Analytics from '../pages/hospital/Analytics.jsx'
-import EmergencyMonitor from '../pages/hospital/EmergencyMonitor.jsx'
+import HospitalDashboard from '../pages/hospital/HospitalDashboard'
+import ManageDoctors     from '../pages/hospital/ManageDoctors'
+import ManagePatients    from '../pages/hospital/ManagePatients'
+import HospitalAnalytics from '../pages/hospital/Analytics'
+import EmergencyMonitor  from '../pages/hospital/EmergencyMonitor'
 
-const hospitalRoutes = (
-  <Route path="/hospital" element={<HospitalLayout />}>
-    <Route index element={<HospitalDashboard />} />
-    <Route path="doctors" element={<ManageDoctors />} />
-    <Route path="patients" element={<ManagePatients />} />
-    <Route path="analytics" element={<Analytics />} />
-    <Route path="emergency" element={<EmergencyMonitor />} />
-  </Route>
-)
+const hospitalRoutes = [
+  <Route key="h-dash"  path="/hospital/dashboard" element={<HospitalDashboard />} />,
+  <Route key="h-doc"   path="/hospital/doctors"   element={<ManageDoctors />} />,
+  <Route key="h-pat"   path="/hospital/patients"  element={<ManagePatients />} />,
+  <Route key="h-ana"   path="/hospital/analytics" element={<HospitalAnalytics />} />,
+  <Route key="h-emer"  path="/hospital/emergency" element={<EmergencyMonitor />} />,
+]
 
 export default hospitalRoutes

@@ -1,117 +1,170 @@
-import { useState } from "react";
-import DoctorLayout from "../../layouts/DoctorLayout";
+import { useState, useEffect, useRef } from 'react'
+import { useAuthStore } from '../../store/authStore'
+import { authService } from '../../services/authService'
+import { User, Phone, Clock, Award, Camera } from 'lucide-react'
+import Input from '../../components/common/Input'
+import Button from '../../components/common/Button'
+import Avatar from '../../components/common/Avatar'
+import Badge from '../../components/common/Badge'
+import toast from 'react-hot-toast'
+import { SPECIALIZATIONS } from '../../utils/constants'
 
-const DoctorProfile = ({ user }) => {
-  const [editing, setEditing] = useState(false);
+export default function DoctorProfile() {
+  const { user, updateUser } = useAuthStore()
+  const [loading, setLoading] = useState(false)
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const [doctorData, setDoctorData] = useState(null)
+  const fileInputRef = useRef(null)
   const [form, setForm] = useState({
-    name: "Dr. Priya Sharma",
-    specialization: "Cardiologist",
-    experience: "8",
-    consultationFee: "500",
-    phone: "9876543210",
-    email: "priya.sharma@medconnect360.com",
-    licenseNumber: "MCI-2025-XY789",
-    bio: "Experienced cardiologist with 8+ years in interventional cardiology. Specializes in preventive care and heart disease management.",
-    hospital: "Apollo Hospital, New Delhi",
-    qualifications: "MBBS, MD (Cardiology), DM (Interventional Cardiology)",
-  });
+    name: user?.name || '',
+    phone: user?.phone || '',
+    specialization: '',
+    experience: '',
+    qualification: '',
+    consultationFee: '',
+    bio: '',
+  })
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  // Fetch doctor profile on mount
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const res = await authService.getDoctorProfile()
+        const doctor = res.data.doctor
+        setDoctorData(doctor)
+        setForm(p => ({
+          ...p,
+          specialization: doctor.specialization || '',
+          experience: doctor.experience || '',
+          qualification: doctor.qualifications?.[0] || '',
+          consultationFee: doctor.consultationFee || '',
+          bio: doctor.biography || '',
+        }))
+      } catch (e) {
+        console.error('Failed to load doctor profile:', e)
+      }
+    }
+    loadProfile()
+  }, [])
+
+  const handleChange = e => setForm(p => ({ ...p, [e.target.name]: e.target.value }))
+
+  const handleSave = async () => {
+    setLoading(true)
+    try {
+      // Update user fields (name, phone)
+      const userUpdates = {
+        name: form.name,
+        phone: form.phone,
+      }
+      
+      // Update doctor fields (specialization, experience, etc.)
+      const doctorUpdates = {
+        specialization: form.specialization,
+        experience: parseInt(form.experience) || 0,
+        qualifications: form.qualification ? [form.qualification] : [],
+        consultationFee: parseFloat(form.consultationFee) || 0,
+        biography: form.bio,
+      }
+
+      // Save both in parallel
+      await Promise.all([
+        authService.updateProfile(userUpdates).catch(e => {
+          if (e.response?.status !== 400) throw e; // Ignore minor errors
+        }),
+        authService.updateDoctorProfile(doctorUpdates)
+      ])
+
+      updateUser({ ...user, ...userUpdates })
+      setDoctorData({ ...doctorData, ...doctorUpdates })
+      toast.success('Profile updated successfully')
+    } catch (e) {
+      toast.error(e.response?.data?.message || e.message || 'Failed to update profile')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setAvatarUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('avatar', file)
+      const res = await import('./../../services/api').then(m =>
+        m.default.put('/auth/me', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+      )
+      const newAvatar = res?.data?.user?.avatar || res?.user?.avatar
+      if (newAvatar) updateUser({ ...user, avatar: newAvatar })
+      toast.success('Profile photo updated!')
+    } catch (e) {
+      toast.error('Failed to upload photo')
+    } finally {
+      setAvatarUploading(false)
+    }
+  }
 
   return (
-    <DoctorLayout user={user}>
-      <div className="space-y-6 max-w-3xl">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-800">My Profile</h1>
+    <div className="space-y-6 animate-fade-in max-w-2xl">
+      <div>
+        <h1 className="section-title">Doctor Profile</h1>
+        <p className="section-subtitle">Manage your professional profile</p>
+      </div>
+
+      <div className="card p-6 flex items-center gap-5">
+        <div className="relative">
+          <Avatar name={user?.name} src={user?.avatar} size="xl" />
           <button
-            onClick={() => setEditing(!editing)}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition ${editing ? "bg-gray-200 text-gray-700 hover:bg-gray-300" : "bg-blue-600 text-white hover:bg-blue-700"}`}
+            className="absolute -bottom-1 -right-1 w-7 h-7 bg-primary-600 rounded-full flex items-center justify-center border-2 border-white disabled:opacity-50"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={avatarUploading}
+            title="Change profile photo"
           >
-            {editing ? "Cancel" : "✏️ Edit Profile"}
+            <Camera className="w-3.5 h-3.5 text-white" />
           </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleAvatarChange}
+          />
         </div>
-
-        {/* Avatar + Basic */}
-        <div className="bg-white rounded-2xl shadow-sm p-6 flex items-center gap-5">
-          <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center text-4xl shrink-0">👨‍⚕️</div>
-          <div>
-            <h2 className="text-xl font-bold text-gray-800">{form.name}</h2>
-            <p className="text-blue-600 font-medium text-sm">{form.specialization}</p>
-            <p className="text-gray-500 text-xs mt-1">{form.hospital}</p>
-            <div className="flex gap-2 mt-2">
-              <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">⭐ 4.9 Rating</span>
-              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">✅ Verified</span>
-            </div>
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">{user?.name}</h2>
+          <p className="text-sm text-slate-500">{user?.email}</p>
+          <div className="flex gap-2 mt-2">
+            <Badge variant="blue">Doctor</Badge>
+            {form.specialization && <Badge variant="gray">{form.specialization}</Badge>}
           </div>
-        </div>
-
-        {/* Form Fields */}
-        <div className="bg-white rounded-2xl shadow-sm p-6">
-          <h3 className="font-bold text-gray-700 mb-4">Professional Details</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {[
-              { name: "name", label: "Full Name" },
-              { name: "specialization", label: "Specialization" },
-              { name: "experience", label: "Experience (Years)" },
-              { name: "consultationFee", label: "Consultation Fee (₹)" },
-              { name: "phone", label: "Phone" },
-              { name: "email", label: "Email" },
-              { name: "licenseNumber", label: "License Number" },
-              { name: "hospital", label: "Hospital" },
-            ].map((f) => (
-              <div key={f.name}>
-                <label className="text-xs font-semibold text-gray-500 block mb-1">{f.label}</label>
-                <input
-                  type="text"
-                  name={f.name}
-                  value={form[f.name]}
-                  onChange={handleChange}
-                  disabled={!editing}
-                  className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400
-                    ${!editing ? "bg-gray-50 text-gray-600 cursor-not-allowed" : "bg-white"}`}
-                />
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-4">
-            <label className="text-xs font-semibold text-gray-500 block mb-1">Qualifications</label>
-            <input
-              type="text"
-              name="qualifications"
-              value={form.qualifications}
-              onChange={handleChange}
-              disabled={!editing}
-              className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400
-                ${!editing ? "bg-gray-50 text-gray-600 cursor-not-allowed" : "bg-white"}`}
-            />
-          </div>
-
-          <div className="mt-4">
-            <label className="text-xs font-semibold text-gray-500 block mb-1">Bio</label>
-            <textarea
-              name="bio"
-              value={form.bio}
-              onChange={handleChange}
-              disabled={!editing}
-              rows={3}
-              className={`w-full border rounded-xl px-4 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-400
-                ${!editing ? "bg-gray-50 text-gray-600 cursor-not-allowed" : "bg-white"}`}
-            />
-          </div>
-
-          {editing && (
-            <button
-              onClick={() => setEditing(false)}
-              className="mt-5 bg-blue-600 text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-blue-700 transition"
-            >
-              Save Changes
-            </button>
-          )}
         </div>
       </div>
-    </DoctorLayout>
-  );
-};
 
-export default DoctorProfile;
+      <div className="card p-6 space-y-5">
+        <h3 className="font-semibold text-slate-900">Professional Information</h3>
+        <div className="grid md:grid-cols-2 gap-4">
+          <Input label="Full Name" name="name" value={form.name} onChange={handleChange} leftIcon={<User className="w-4 h-4" />} />
+          <Input label="Mobile" name="phone" value={form.phone} onChange={handleChange} leftIcon={<Phone className="w-4 h-4" />} />
+          <div>
+            <label className="label-base">Specialization</label>
+            <select name="specialization" value={form.specialization} onChange={handleChange} className="input-base">
+              <option value="">Select specialization</option>
+              {SPECIALIZATIONS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <Input label="Experience (years)" name="experience" type="number" value={form.experience} onChange={handleChange} leftIcon={<Clock className="w-4 h-4" />} />
+          <Input label="Qualification" name="qualification" value={form.qualification} onChange={handleChange} leftIcon={<Award className="w-4 h-4" />} placeholder="e.g. MBBS, MD" />
+          <Input label="Consultation Fee (₹)" name="consultationFee" type="number" value={form.consultationFee} onChange={handleChange} />
+        </div>
+        <div>
+          <label className="label-base">Bio</label>
+          <textarea name="bio" rows={3} value={form.bio} onChange={handleChange} className="input-base resize-none" placeholder="Brief professional description…" />
+        </div>
+        <div className="flex justify-end">
+          <Button loading={loading} onClick={handleSave}>Save Changes</Button>
+        </div>
+      </div>
+    </div>
+  )
+}

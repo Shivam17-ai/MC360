@@ -1,31 +1,28 @@
 import { Route } from 'react-router-dom'
-import PatientLayout from '../layouts/PatientLayout.jsx'
-import PatientDashboard from '../pages/patient/PatientDashboard.jsx'
-import BookAppointment from '../pages/patient/BookAppointment.jsx'
-import BookTest from '../pages/patient/BookTest.jsx'
-import MyAppointments from '../pages/patient/MyAppointments.jsx'
-import MyReports from '../pages/patient/MyReports.jsx'
-import MedicineTracker from '../pages/patient/MedicineTracker.jsx'
-import HealthAnalytics from '../pages/patient/HealthAnalytics.jsx'
-import SymptomChecker from '../pages/patient/SymptomChecker.jsx'
-import DietPlanner from '../pages/patient/DietPlanner.jsx'
-import Profile from '../pages/patient/Profile.jsx'
-import VideoSession from '../pages/patient/VideoSession.jsx'
+import PatientDashboard   from '../pages/patient/PatientDashboard'
+import BookAppointment    from '../pages/patient/BookAppointment'
+import BookTest           from '../pages/patient/BookTest'
+import MyAppointments     from '../pages/patient/MyAppointments'
+import MyReports          from '../pages/patient/MyReports'
+import MedicineTracker    from '../pages/patient/MedicineTracker'
+import HealthAnalytics    from '../pages/patient/HealthAnalytics'
+import SymptomCheckerPage from '../pages/patient/SymptomChecker'
+import DietPlanner        from '../pages/patient/DietPlanner'
+import PatientProfile     from '../pages/patient/Profile'
+import VideoSession       from '../pages/patient/VideoSession'
 
-const patientRoutes = (
-  <Route path="/patient" element={<PatientLayout />}>
-    <Route index element={<PatientDashboard />} />
-    <Route path="book-appointment" element={<BookAppointment />} />
-    <Route path="book-test" element={<BookTest />} />
-    <Route path="appointments" element={<MyAppointments />} />
-    <Route path="reports" element={<MyReports />} />
-    <Route path="medicines" element={<MedicineTracker />} />
-    <Route path="analytics" element={<HealthAnalytics />} />
-    <Route path="symptom-checker" element={<SymptomChecker />} />
-    <Route path="diet" element={<DietPlanner />} />
-    <Route path="profile" element={<Profile />} />
-    <Route path="video/:sessionId" element={<VideoSession />} />
-  </Route>
-)
+const patientRoutes = [
+  <Route key="p-dash"   path="/patient/dashboard"        element={<PatientDashboard />} />,
+  <Route key="p-book"   path="/patient/book-appointment" element={<BookAppointment />} />,
+  <Route key="p-test"   path="/patient/book-test"        element={<BookTest />} />,
+  <Route key="p-appt"   path="/patient/appointments"     element={<MyAppointments />} />,
+  <Route key="p-rep"    path="/patient/reports"          element={<MyReports />} />,
+  <Route key="p-med"    path="/patient/medicines"        element={<MedicineTracker />} />,
+  <Route key="p-ana"    path="/patient/analytics"        element={<HealthAnalytics />} />,
+  <Route key="p-symp"   path="/patient/symptom-checker"  element={<SymptomCheckerPage />} />,
+  <Route key="p-diet"   path="/patient/diet"             element={<DietPlanner />} />,
+  <Route key="p-prof"   path="/patient/profile"          element={<PatientProfile />} />,
+  <Route key="p-vid"    path="/patient/video/:sessionId" element={<VideoSession />} />,
+]
 
 export default patientRoutes

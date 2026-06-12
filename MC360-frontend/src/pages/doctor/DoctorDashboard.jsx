@@ -1,95 +1,139 @@
-import DoctorLayout from "../../layouts/DoctorLayout";
+import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
+import { Calendar, Users, Clock, Video, ArrowRight, CheckCircle2 } from 'lucide-react'
+import { useAuthStore } from '../../store/authStore'
+import { appointmentService } from '../../services/appointmentService'
+import Avatar from '../../components/common/Avatar'
+import Badge from '../../components/common/Badge'
+import { smartDate } from '../../utils/formatDate'
 
-const stats = [
-  { label: "Today's Appointments", value: 12, icon: "📅", color: "bg-blue-50 text-blue-700" },
-  { label: "Total Patients", value: 340, icon: "🧑‍⚕️", color: "bg-green-50 text-green-700" },
-  { label: "Pending Reports", value: 5, icon: "📋", color: "bg-yellow-50 text-yellow-700" },
-  { label: "Video Consults Today", value: 4, icon: "🎥", color: "bg-purple-50 text-purple-700" },
-];
+export default function DoctorDashboard() {
+  const { user } = useAuthStore()
 
-const recentPatients = [
-  { name: "Aarav Sharma", age: 34, condition: "Hypertension", time: "09:00 AM", status: "completed" },
-  { name: "Priya Mehta", age: 28, condition: "Fever & Cold", time: "10:00 AM", status: "completed" },
-  { name: "Rohan Das", age: 45, condition: "Diabetes Follow-up", time: "11:30 AM", status: "in-progress" },
-  { name: "Sneha Kapoor", age: 31, condition: "Back Pain", time: "02:00 PM", status: "pending" },
-];
+  const { data: todayAppts, isLoading: isTodayLoading } = useQuery({
+    queryKey: ['doctor-appointments', 'today', new Date().toDateString()],
+    queryFn: () => {
+      const todayStart = new Date()
+      todayStart.setHours(0, 0, 0, 0)
+      const todayEnd = new Date()
+      todayEnd.setHours(23, 59, 59, 999)
+      return appointmentService.getAll({
+        status: 'confirmed',
+        from: todayStart.toISOString(),
+        to: todayEnd.toISOString(),
+        limit: 10,
+      }).then(r => r.data)
+    },
+  })
 
-const statusColors = {
-  completed: "bg-green-100 text-green-700",
-  "in-progress": "bg-blue-100 text-blue-700",
-  pending: "bg-yellow-100 text-yellow-700",
-};
+  const { data: upcomingAppts, isLoading: isUpcomingLoading } = useQuery({
+    queryKey: ['doctor-appointments', 'upcoming-dashboard'],
+    queryFn: () => {
+      const tomorrow = new Date()
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      tomorrow.setHours(0, 0, 0, 0)
+      return appointmentService.getAll({
+        status: 'confirmed',
+        from: tomorrow.toISOString(),
+        limit: 5,
+      }).then(r => r.data)
+    },
+  })
 
-const DoctorDashboard = ({ user }) => (
-  <DoctorLayout user={user}>
-    <div className="space-y-6">
+  const appointments = todayAppts || []
+  const upcoming = upcomingAppts || []
 
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-800">Doctor Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">Thursday, {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</p>
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Good morning, {user?.name?.split(' ')[0]} 👋</h1>
+          <p className="text-sm text-slate-500 mt-1">Here's your schedule for today.</p>
+        </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((s) => (
-          <div key={s.label} className={`rounded-2xl p-5 ${s.color} shadow-sm`}>
-            <div className="text-3xl mb-2">{s.icon}</div>
-            <div className="text-2xl font-bold">{s.value}</div>
-            <div className="text-xs font-medium mt-1">{s.label}</div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {[
+          { label: "Today's Appointments", value: appointments.length, icon: Calendar, bg: 'bg-primary-50', color: 'text-primary-600' },
+          { label: 'Total Patients', value: '248', icon: Users, bg: 'bg-teal-50', color: 'text-teal-600' },
+          { label: 'Upcoming', value: upcoming.length, icon: Clock, bg: 'bg-amber-50', color: 'text-amber-600' },
+        ].map(s => (
+          <div key={s.label} className="stat-card">
+            <div className={`w-11 h-11 ${s.bg} rounded-xl flex items-center justify-center shrink-0`}>
+              <s.icon className={`w-5 h-5 ${s.color}`} />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-slate-900">{s.value}</p>
+              <p className="text-xs text-slate-500">{s.label}</p>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Recent Patients */}
-      <div className="bg-white rounded-2xl shadow-sm p-6">
-        <h2 className="text-lg font-bold text-gray-800 mb-4">Today's Patients</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-gray-400 border-b border-gray-100">
-                <th className="pb-3 font-semibold">Patient</th>
-                <th className="pb-3 font-semibold">Age</th>
-                <th className="pb-3 font-semibold">Condition</th>
-                <th className="pb-3 font-semibold">Time</th>
-                <th className="pb-3 font-semibold">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {recentPatients.map((p, i) => (
-                <tr key={i} className="hover:bg-gray-50 transition">
-                  <td className="py-3 font-medium text-gray-800">{p.name}</td>
-                  <td className="py-3 text-gray-500">{p.age}</td>
-                  <td className="py-3 text-gray-600">{p.condition}</td>
-                  <td className="py-3 text-gray-500">{p.time}</td>
-                  <td className="py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${statusColors[p.status]}`}>
-                      {p.status}
-                    </span>
-                  </td>
-                </tr>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Today's appointments */}
+        <div className="card p-5">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-base font-semibold text-slate-900">Today's Schedule</h2>
+            <Link to="/doctor/appointments" className="text-xs text-primary-600 hover:underline flex items-center gap-1">View all <ArrowRight className="w-3 h-3" /></Link>
+          </div>
+          {isTodayLoading ? (
+            <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="skeleton h-16 rounded-xl" />)}</div>
+          ) : appointments.length === 0 ? (
+            <div className="text-center py-10">
+              <Calendar className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+              <p className="text-slate-400 text-sm">No appointments today</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {appointments.map(appt => (
+                <div key={appt._id} className="flex items-center gap-4 p-3 rounded-xl hover:bg-surface-50 transition-colors border border-transparent hover:border-surface-100">
+                  <span className="text-[11px] font-bold text-slate-500 w-16 shrink-0">{appt.timeSlot.split(' - ')[0]}</span>
+                  <Avatar name={appt.patient?.user?.name} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-900 truncate">{appt.patient?.user?.name || '—'}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{appt.reason}</p>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          )}
+        </div>
+
+        {/* Upcoming appointments */}
+        <div className="card p-5">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-base font-semibold text-slate-900">Upcoming Preview</h2>
+            <Link to="/doctor/appointments?tab=upcoming" className="text-xs text-primary-600 hover:underline flex items-center gap-1">Manage <ArrowRight className="w-3 h-3" /></Link>
+          </div>
+          {isUpcomingLoading ? (
+            <div className="space-y-3">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="skeleton h-16 rounded-xl" />)}</div>
+          ) : upcoming.length === 0 ? (
+            <div className="text-center py-10">
+              <Clock className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+              <p className="text-slate-400 text-sm">No upcoming appointments</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {upcoming.map(appt => (
+                <div key={appt._id} className="flex items-center gap-4 p-3 rounded-xl hover:bg-surface-50 transition-colors border border-transparent hover:border-surface-100">
+                  <div className="w-16 shrink-0 text-center">
+                    <p className="text-[10px] font-bold text-primary-600 uppercase">{new Date(appt.date).toLocaleDateString('en-US', { month: 'short' })}</p>
+                    <p className="text-lg font-bold text-slate-900 leading-none">{new Date(appt.date).getDate()}</p>
+                  </div>
+                  <Avatar name={appt.patient?.user?.name} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-900 truncate">{appt.patient?.user?.name || '—'}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{appt.timeSlot} • {appt.type}</p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-slate-300" />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: "Write Prescription", icon: "📝", color: "bg-blue-600" },
-          { label: "Start Video Call", icon: "🎥", color: "bg-purple-600" },
-          { label: "View Reports", icon: "📋", color: "bg-green-600" },
-          { label: "Manage Schedule", icon: "📅", color: "bg-orange-500" },
-        ].map((a) => (
-          <button key={a.label} className={`${a.color} text-white rounded-2xl p-4 text-sm font-semibold flex flex-col items-center gap-2 hover:opacity-90 transition shadow-sm`}>
-            <span className="text-2xl">{a.icon}</span>
-            {a.label}
-          </button>
-        ))}
-      </div>
     </div>
-  </DoctorLayout>
-);
-
-export default DoctorDashboard;
+  )
+}

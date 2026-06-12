@@ -1,50 +1,37 @@
-// Email
-export const isValidEmail = (email) =>
-  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+import { z } from 'zod'
 
-// Phone (Indian 10-digit)
-export const isValidPhone = (phone) =>
-  /^[6-9]\d{9}$/.test(phone)
+export const loginSchema = z.object({
+  email: z.string().email('Enter a valid email'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+})
 
-// Password — min 8 chars, 1 uppercase, 1 number
-export const isValidPassword = (password) =>
-  /^(?=.*[A-Z])(?=.*\d).{8,}$/.test(password)
+export const registerSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  email: z.string().email('Enter a valid email'),
+  phone: z.string().regex(/^[6-9]\d{9}$/, 'Enter a valid 10-digit mobile number'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  role: z.enum(['patient', 'doctor', 'hospital']),
+})
 
-// Name — letters and spaces only
-export const isValidName = (name) =>
-  /^[a-zA-Z\s]{2,50}$/.test(name.trim())
+export const appointmentSchema = z.object({
+  doctorId: z.string().min(1, 'Select a doctor'),
+  date: z.string().min(1, 'Select a date'),
+  slot: z.string().min(1, 'Select a time slot'),
+  reason: z.string().min(5, 'Describe your reason briefly'),
+})
 
-// Pincode (India)
-export const isValidPincode = (pin) =>
-  /^\d{6}$/.test(pin)
+export const medicineSchema = z.object({
+  name: z.string().min(2, 'Medicine name required'),
+  dosage: z.string().min(1, 'Dosage required'),
+  frequency: z.string().min(1, 'Frequency required'),
+  startDate: z.string().min(1, 'Start date required'),
+  endDate: z.string().optional(),
+  notes: z.string().optional(),
+})
 
-// Aadhar
-export const isValidAadhar = (aadhar) =>
-  /^\d{12}$/.test(aadhar)
-
-// Required field
-export const isRequired = (value) =>
-  value !== undefined && value !== null && String(value).trim() !== ''
-
-// Validate full login form
-export const validateLogin = ({ email, password }) => {
-  const errors = {}
-  if (!isRequired(email))       errors.email    = 'Email is required'
-  else if (!isValidEmail(email)) errors.email   = 'Enter a valid email'
-  if (!isRequired(password))    errors.password = 'Password is required'
-  return errors
-}
-
-// Validate full register form
-export const validateRegister = ({ name, email, phone, password }) => {
-  const errors = {}
-  if (!isRequired(name))          errors.name     = 'Name is required'
-  else if (!isValidName(name))    errors.name     = 'Enter a valid name'
-  if (!isRequired(email))         errors.email    = 'Email is required'
-  else if (!isValidEmail(email))  errors.email    = 'Enter a valid email'
-  if (!isRequired(phone))         errors.phone    = 'Phone is required'
-  else if (!isValidPhone(phone))  errors.phone    = 'Enter a valid 10-digit phone'
-  if (!isRequired(password))      errors.password = 'Password is required'
-  else if (!isValidPassword(password)) errors.password = 'Min 8 chars, 1 uppercase, 1 number'
-  return errors
-}
+export const healthMetricSchema = z.object({
+  type: z.enum(['weight', 'blood_pressure', 'glucose', 'heart_rate', 'oxygen']),
+  value: z.string().min(1, 'Value required'),
+  unit: z.string().min(1, 'Unit required'),
+  recordedAt: z.string().optional(),
+})

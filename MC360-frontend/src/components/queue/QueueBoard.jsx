@@ -1,41 +1,65 @@
+import { Users, ArrowRight } from 'lucide-react'
 import Badge from '../common/Badge'
-import Card from '../common/Card'
 
-const mockQueue = [
-  { token: 'A-038', name: 'Rajesh Kumar',  status: 'called',    room: 'Room 3' },
-  { token: 'A-039', name: 'Sunita Devi',   status: 'called',    room: 'Room 1' },
-  { token: 'A-040', name: 'Amit Sharma',   status: 'waiting',   room: '—' },
-  { token: 'A-041', name: 'Meena Patel',   status: 'waiting',   room: '—' },
-  { token: 'A-042', name: 'You',           status: 'waiting',   room: '—' },
-  { token: 'A-043', name: 'Kavita Singh',  status: 'waiting',   room: '—' },
-  { token: 'A-044', name: 'Rahul Verma',   status: 'completed', room: 'Done' },
-]
-
-const statusColors = { called: 'green', waiting: 'amber', completed: 'blue' }
-
-export default function QueueBoard({ queue }) {
-  const list = queue || mockQueue
-
+export default function QueueBoard({ queue, currentToken, onNext, onSkip, isDoctor }) {
   return (
-    <Card>
-      <h3 className="font-display font-semibold text-slate-800 mb-4">Live Queue Board</h3>
-      <div className="space-y-2">
-        {list.map((item) => (
-          <div key={item.token}
-            className={`flex items-center justify-between p-3 rounded-xl transition-colors ${item.name === 'You' ? 'bg-primary-50 border border-primary-200' : 'bg-slate-50'}`}>
-            <div className="flex items-center gap-3">
-              <span className={`text-sm font-bold ${item.name === 'You' ? 'text-primary-700' : 'text-slate-700'}`}>
-                {item.token}
-              </span>
-              <span className="text-sm text-slate-600">{item.name}</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-slate-400">{item.room}</span>
-              <Badge variant={statusColors[item.status]} className="capitalize">{item.status}</Badge>
-            </div>
-          </div>
-        ))}
+    <div className="card overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-surface-200">
+        <div className="flex items-center gap-2">
+          <Users className="w-4 h-4 text-primary-500" />
+          <h3 className="text-sm font-semibold text-slate-900">Live Queue</h3>
+          <span className="badge-blue">{queue.filter((q) => q.status === 'waiting').length} waiting</span>
+        </div>
+        {isDoctor && currentToken && (
+          <button onClick={onNext} className="btn-primary text-xs gap-1.5 px-3 py-1.5">
+            Next <ArrowRight className="w-3 h-3" />
+          </button>
+        )}
       </div>
-    </Card>
+
+      <div className="divide-y divide-surface-100 max-h-80 overflow-y-auto">
+        {queue.length === 0 ? (
+          <div className="px-5 py-8 text-center text-slate-400 text-sm">
+            Queue is empty
+          </div>
+        ) : (
+          queue.map((item, i) => (
+            <div
+              key={item._id}
+              className={`flex items-center gap-4 px-5 py-3 ${
+                item.status === 'in_progress' ? 'bg-primary-50' : ''
+              }`}
+            >
+              <span className="w-8 h-8 rounded-xl bg-surface-100 flex items-center justify-center text-sm font-bold text-slate-600 font-mono shrink-0">
+                {item.tokenNumber}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-900 truncate">
+                  {item.patient?.name || `Patient #${i + 1}`}
+                </p>
+              </div>
+              <Badge
+                variant={
+                  item.status === 'in_progress' ? 'blue'
+                    : item.status === 'done' ? 'green'
+                      : item.status === 'skipped' ? 'gray'
+                        : 'yellow'
+                }
+              >
+                {item.status?.replace(/_/g, ' ')}
+              </Badge>
+              {isDoctor && item.status === 'waiting' && onSkip && (
+                <button
+                  onClick={() => onSkip(item._id)}
+                  className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  Skip
+                </button>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
   )
 }

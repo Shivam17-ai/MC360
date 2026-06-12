@@ -1,29 +1,46 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, ReferenceLine, Cell,
+} from 'recharts'
 
-const sampleData = [
-  { date: "Mon", glucose: 95 },
-  { date: "Tue", glucose: 102 },
-  { date: "Wed", glucose: 98 },
-  { date: "Thu", glucose: 110 },
-  { date: "Fri", glucose: 92 },
-  { date: "Sat", glucose: 88 },
-  { date: "Sun", glucose: 96 },
-];
+const NORMAL_RANGE = { min: 70, max: 99 }
 
-const GlucoseChart = ({ data = sampleData }) => (
-  <div className="bg-white p-6 rounded-2xl shadow-md">
-    <h3 className="text-lg font-bold text-amber-600 mb-4">Blood Glucose (mg/dL)</h3>
-    <ResponsiveContainer width="100%" height={220}>
+export default function GlucoseChart({ data }) {
+  return (
+    <ResponsiveContainer width="100%" height={200}>
       <BarChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="date" />
-        <YAxis domain={[60, 140]} />
-        <Tooltip />
-        <ReferenceLine y={100} stroke="#f59e0b" strokeDasharray="4 4" label="Normal" />
-        <Bar dataKey="glucose" fill="#fbbf24" radius={[4, 4, 0, 0]} />
+        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+        <XAxis
+          dataKey="date"
+          tick={{ fontSize: 11, fill: '#94a3b8' }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <YAxis
+          tick={{ fontSize: 11, fill: '#94a3b8' }}
+          axisLine={false}
+          tickLine={false}
+          unit=" mg"
+        />
+        <Tooltip
+          contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+          formatter={(v) => [`${v} mg/dL`, 'Glucose']}
+        />
+        <ReferenceLine y={NORMAL_RANGE.max} stroke="#f59e0b" strokeDasharray="4 4" />
+        <ReferenceLine y={NORMAL_RANGE.min} stroke="#10b981" strokeDasharray="4 4" />
+        <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+          {data.map((entry, i) => (
+            <Cell
+              key={i}
+              fill={
+                entry.value > NORMAL_RANGE.max ? '#ef4444'
+                  : entry.value < NORMAL_RANGE.min ? '#f59e0b'
+                    : '#10b981'
+              }
+            />
+          ))}
+        </Bar>
       </BarChart>
     </ResponsiveContainer>
-  </div>
-);
-
-export default GlucoseChart;
+  )
+}

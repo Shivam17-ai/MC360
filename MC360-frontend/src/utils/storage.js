@@ -1,46 +1,25 @@
-import { TOKEN_KEY, USER_KEY } from './constants'
+const PREFIX = 'mc360_'
 
-// ── Token ─────────────────────────────────────────
-export const getToken = () => localStorage.getItem(TOKEN_KEY)
-
-export const setToken = (token) => localStorage.setItem(TOKEN_KEY, token)
-
-export const removeToken = () => localStorage.removeItem(TOKEN_KEY)
-
-// ── User ──────────────────────────────────────────
-export const getUser = () => {
-  try {
-    const raw = localStorage.getItem(USER_KEY)
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
+export const storage = {
+  get: (key) => {
+    try {
+      const item = localStorage.getItem(PREFIX + key)
+      return item ? JSON.parse(item) : null
+    } catch {
+      return null
+    }
+  },
+  set: (key, value) => {
+    try {
+      localStorage.setItem(PREFIX + key, JSON.stringify(value))
+    } catch {}
+  },
+  remove: (key) => {
+    localStorage.removeItem(PREFIX + key)
+  },
+  clear: () => {
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith(PREFIX))
+      .forEach((k) => localStorage.removeItem(k))
+  },
 }
-
-export const setUser = (user) => localStorage.setItem(USER_KEY, JSON.stringify(user))
-
-export const removeUser = () => localStorage.removeItem(USER_KEY)
-
-// ── Clear all auth data ───────────────────────────
-export const clearAuth = () => {
-  removeToken()
-  removeUser()
-}
-
-// ── Generic ───────────────────────────────────────
-export const setItem = (key, value) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(value))
-  } catch {}
-}
-
-export const getItem = (key) => {
-  try {
-    const raw = localStorage.getItem(key)
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
-}
-
-export const removeItem = (key) => localStorage.removeItem(key)

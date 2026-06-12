@@ -1,44 +1,67 @@
-const DoctorCard = ({ doctor = {}, onBook }) => {
-  const {
-    name = "Dr. Priya Sharma",
-    specialization = "Cardiologist",
-    experience = "8 years",
-    rating = 4.8,
-    fee = 500,
-    available = true,
-    profilePicture = null,
-  } = doctor;
+import { Star, Clock, MapPin, Video, User } from 'lucide-react'
+import Avatar from '../common/Avatar'
+import Badge from '../common/Badge'
+import Button from '../common/Button'
 
+export default function DoctorCard({ doctor, onSelect, selected }) {
   return (
-    <div className="bg-white rounded-2xl shadow-md p-5 flex gap-4 border border-gray-100 hover:shadow-lg transition">
-      <div className="w-14 h-14 rounded-full bg-blue-100 flex items-center justify-center text-2xl overflow-hidden shrink-0">
-        {profilePicture ? <img src={profilePicture} alt={name} className="w-full h-full object-cover rounded-full" /> : "👨‍⚕️"}
-      </div>
-      <div className="flex-1">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="font-bold text-gray-800">{name}</p>
-            <p className="text-sm text-blue-600">{specialization}</p>
+    <div
+      onClick={() => onSelect?.(doctor)}
+      className={`card-hover p-5 cursor-pointer transition-all ${
+        selected ? 'ring-2 ring-primary-500 bg-primary-50/30' : ''
+      }`}
+    >
+      <div className="flex gap-4">
+        <Avatar name={doctor.name} src={doctor.avatar} size="lg" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h3 className="font-semibold text-slate-900">{doctor.name}</h3>
+              <p className="text-sm text-slate-500">{doctor.specialization}</p>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+              <span className="text-sm font-semibold text-slate-700">
+                {doctor.rating || '4.8'}
+              </span>
+            </div>
           </div>
-          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${available ? "bg-green-100 text-green-600" : "bg-gray-100 text-gray-500"}`}>
-            {available ? "Available" : "Busy"}
-          </span>
-        </div>
-        <div className="text-xs text-gray-500 mt-1 space-x-3">
-          <span>⭐ {rating}</span>
-          <span>🕒 {experience}</span>
-          <span>💰 ₹{fee}</span>
-        </div>
-        <button
-          onClick={onBook}
-          disabled={!available}
-          className="mt-3 text-sm bg-blue-600 text-white px-4 py-1.5 rounded-lg hover:bg-blue-700 transition disabled:opacity-40"
-        >
-          Book Appointment
-        </button>
-      </div>
-    </div>
-  );
-};
 
-export default DoctorCard;
+          <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-500">
+            <span className="flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {doctor.experience || '—'} yrs exp
+            </span>
+            {doctor.hospital && (
+              <span className="flex items-center gap-1">
+                <MapPin className="w-3 h-3" />
+                <span className="truncate max-w-[120px]">{doctor.hospital?.name}</span>
+              </span>
+            )}
+            <span className="font-medium text-slate-700">
+              ₹{doctor.consultationFee || '500'}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            <Badge variant="green" dot>Available</Badge>
+            {doctor.offersVideo && <Badge variant="blue"><Video className="w-3 h-3" />Video</Badge>}
+            {doctor.offersInPerson !== false && <Badge variant="gray"><User className="w-3 h-3" />In-person</Badge>}
+          </div>
+        </div>
+      </div>
+
+      {onSelect && (
+        <div className="mt-4 pt-4 border-t border-surface-100">
+          <Button
+            size="sm"
+            variant={selected ? 'primary' : 'secondary'}
+            className="w-full justify-center"
+          >
+            {selected ? 'Selected' : 'Select Doctor'}
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}

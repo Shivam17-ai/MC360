@@ -1,104 +1,68 @@
-import { Pill, Clock, Trash2, Edit2, CheckCircle2, XCircle } from "lucide-react";
-import Badge from "../common/Badge";
+import { Pill, Trash2, Edit2, CheckCircle2, Clock } from 'lucide-react'
+import Badge from '../common/Badge'
+import { formatDate } from '../../utils/formatDate'
 
-const frequencyLabel = {
-  once: "Once a day",
-  twice: "Twice a day",
-  thrice: "Thrice a day",
-  weekly: "Weekly",
-  custom: "Custom",
-};
-
-const MedicineCard = ({ medicine, onEdit, onDelete, onToggleTaken }) => {
-  const { _id, name, dosage, frequency, timings = [], isTaken, notes, startDate, endDate } = medicine;
-
+export default function MedicineCard({ medicine, onDelete, onEdit, onLog }) {
   return (
-    <div
-      className={`bg-white rounded-2xl border transition-all duration-200 p-5 flex flex-col gap-4 shadow-sm hover:shadow-md ${
-        isTaken ? "border-green-200 bg-green-50/30" : "border-gray-200"
-      }`}
-    >
-      {/* Header */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-3">
-          <div
-            className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-              isTaken ? "bg-green-100 text-green-600" : "bg-blue-100 text-blue-600"
-            }`}
-          >
-            <Pill size={20} />
-          </div>
-          <div>
-            <h3 className="font-semibold text-gray-800 text-sm">{name}</h3>
-            <p className="text-xs text-gray-500">{dosage}</p>
-          </div>
+    <div className="card p-5 flex flex-col gap-3">
+      <div className="flex items-start justify-between">
+        <div className="w-11 h-11 bg-amber-50 rounded-xl flex items-center justify-center shrink-0">
+          <Pill className="w-5 h-5 text-amber-500" />
         </div>
-        <Badge variant={isTaken ? "success" : "warning"}>
-          {isTaken ? "Taken" : "Pending"}
+        <div className="flex gap-1.5">
+          {onEdit && (
+            <button
+              onClick={() => onEdit(medicine)}
+              className="p-1.5 rounded-lg hover:bg-surface-100 text-slate-400 hover:text-slate-700 transition-colors"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              onClick={() => onDelete(medicine._id)}
+              className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div>
+        <h3 className="font-semibold text-slate-900">{medicine.name}</h3>
+        <p className="text-sm text-slate-500 mt-0.5">{medicine.dosage}</p>
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        <Badge variant="yellow">
+          <Clock className="w-3 h-3" />
+          {medicine.frequency?.replace(/_/g, ' ')}
+        </Badge>
+        <Badge variant={medicine.isActive ? 'green' : 'gray'} dot>
+          {medicine.isActive ? 'Active' : 'Inactive'}
         </Badge>
       </div>
 
-      {/* Frequency & timings */}
-      <div className="flex flex-wrap gap-2 text-xs text-gray-600">
-        <span className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded-lg">
-          <Clock size={12} />
-          {frequencyLabel[frequency] || frequency}
-        </span>
-        {timings.map((t, i) => (
-          <span key={i} className="bg-blue-50 text-blue-600 px-2 py-1 rounded-lg">
-            {t}
-          </span>
-        ))}
+      <div className="text-xs text-slate-400 border-t border-surface-100 pt-2">
+        Started: {formatDate(medicine.startDate)}
+        {medicine.endDate && ` · Ends: ${formatDate(medicine.endDate)}`}
       </div>
 
-      {/* Dates */}
-      {(startDate || endDate) && (
-        <p className="text-xs text-gray-400">
-          {startDate && `From ${new Date(startDate).toLocaleDateString()}`}
-          {endDate && ` → ${new Date(endDate).toLocaleDateString()}`}
+      {medicine.notes && (
+        <p className="text-xs text-slate-500 bg-surface-50 rounded-lg px-3 py-2">
+          {medicine.notes}
         </p>
       )}
 
-      {/* Notes */}
-      {notes && (
-        <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100 italic">
-          {notes}
-        </p>
-      )}
-
-      {/* Actions */}
-      <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+      {onLog && medicine.isActive && (
         <button
-          onClick={() => onToggleTaken?.(_id)}
-          className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
-            isTaken
-              ? "bg-green-100 text-green-700 hover:bg-green-200"
-              : "bg-gray-100 text-gray-600 hover:bg-blue-50 hover:text-blue-600"
-          }`}
+          onClick={() => onLog(medicine._id)}
+          className="flex items-center justify-center gap-2 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-medium transition-colors border border-emerald-200"
         >
-          {isTaken ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-          {isTaken ? "Mark Undone" : "Mark Taken"}
+          <CheckCircle2 className="w-3.5 h-3.5" /> Mark as Taken
         </button>
-
-        <div className="flex gap-2">
-          <button
-            onClick={() => onEdit?.(medicine)}
-            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-            title="Edit"
-          >
-            <Edit2 size={15} />
-          </button>
-          <button
-            onClick={() => onDelete?.(_id)}
-            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-            title="Delete"
-          >
-            <Trash2 size={15} />
-          </button>
-        </div>
-      </div>
+      )}
     </div>
-  );
-};
-
-export default MedicineCard;
+  )
+}

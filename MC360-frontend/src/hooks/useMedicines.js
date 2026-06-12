@@ -1,88 +1,26 @@
-import { useState, useEffect, useCallback } from "react";
-import medicineService from "../services/medicineService";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { medicineService } from '../services/medicineService'
+import toast from 'react-hot-toast'
 
-/**
- * useMedicines
- * Fetches and manages patient medicines + adherence toggle.
- *
- * Usage:
- *   const { medicines, loading, error, addMedicine, updateMedicine, deleteMedicine, toggleTaken } = useMedicines();
- */
-const useMedicines = () => {
-  const [medicines, setMedicines] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+export const useMedicines = () => {
+  const qc = useQueryClient()
 
-  const fetchMedicines = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await medicineService.getMedicines();
-      setMedicines(data);
-    } catch (err) {
-      setError(err.message || "Failed to fetch medicines.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const { data, isLoading } = useQuery({
+    queryKey: ['medicines'],
+    queryFn: () => medicineService.getAll().then((r) => r.data),
+  })
 
-  useEffect(() => {
-    fetchMedicines();
-  }, [fetchMedicines]);
+  const create = useMutation({
+    mutationFn: medicineService.create,
+    onSuccess: () => { qc.invalidateQueries(['medicines']); toast.success('Medicine added') },
+    onError: (e) => toast.error(e.message),
+  })
 
-  const addMedicine = async (payload) => {
-    try {
-      const created = await medicineService.addMedicine(payload);
-      setMedicines((prev) => [created, ...prev]);
-      return created;
-    } catch (err) {
-      setError(err.message || "Failed to add medicine.");
-      throw err;
-    }
-  };
+  const remove = useMutation({
+    mutationFn: medicineService.delete,
+    onSuccess: () => { qc.invalidateQueries(['medicines']); toast.success('Medicine removed') },
+    onError: (e) => toast.error(e.message),
+  })
 
-  const updateMedicine = async (id, payload) => {
-    try {
-      const updated = await medicineService.updateMedicine(id, payload);
-      setMedicines((prev) => prev.map((m) => (m._id === id ? updated : m)));
-      return updated;
-    } catch (err) {
-      setError(err.message || "Failed to update medicine.");
-      throw err;
-    }
-  };
-
-  const deleteMedicine = async (id) => {
-    try {
-      await medicineService.deleteMedicine(id);
-      setMedicines((prev) => prev.filter((m) => m._id !== id));
-    } catch (err) {
-      setError(err.message || "Failed to delete medicine.");
-      throw err;
-    }
-  };
-
-  const toggleTaken = async (id) => {
-    try {
-      const updated = await medicineService.toggleTaken(id);
-      setMedicines((prev) => prev.map((m) => (m._id === id ? updated : m)));
-      return updated;
-    } catch (err) {
-      setError(err.message || "Failed to update adherence.");
-      throw err;
-    }
-  };
-
-  return {
-    medicines,
-    loading,
-    error,
-    addMedicine,
-    updateMedicine,
-    deleteMedicine,
-    toggleTaken,
-    refetch: fetchMedicines,
-  };
-};
-
-export default useMedicines;
+  return { medicines: data || [], isLoading, create, remove }
+}
