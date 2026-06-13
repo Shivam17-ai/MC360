@@ -67,4 +67,68 @@ const collectSample = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { orderTest, getMyTests, getTestById, updateTestStatus, collectSample };
+const bookTest = async (req, res, next) => {
+  try {
+    const { tests, date, homeCollection, address } = req.body;
+    const patient = await Patient.findOne({ user: req.user._id });
+    if (!patient) return errorResponse(res, "Patient profile not found.", 404);
+
+    const categoryMap = {
+      'Complete Blood Count (CBC)': 'blood',
+      'Lipid Profile': 'blood',
+      'Blood Sugar (Fasting)': 'blood',
+      'HbA1c': 'blood',
+      'Thyroid Profile (T3/T4/TSH)': 'blood',
+      'Liver Function Test': 'blood',
+      'Kidney Function Test': 'blood',
+      'Chest X-Ray': 'imaging',
+      'Abdominal Ultrasound': 'imaging',
+      'ECG': 'cardiology',
+      'ECHO': 'cardiology',
+      'MRI Brain': 'imaging',
+      'CT Scan Abdomen': 'imaging',
+      'Urine Routine & Microscopy': 'urine',
+      'Urine Culture': 'urine',
+      'Stool Routine': 'urine',
+    };
+
+    const createdTests = [];
+    for (const testName of tests) {
+      const test = await Test.create({
+        patient: patient._id,
+        testName,
+        category: categoryMap[testName] || 'other',
+        scheduledDate: new Date(date),
+        homeCollection,
+        collectionAddress: address,
+        status: 'ordered'
+      });
+      createdTests.push(test);
+    }
+
+    return successResponse(res, { tests: createdTests }, "Tests booked successfully.", 201);
+  } catch (err) { next(err); }
+};
+
+const cancelTest = async (req, res, next) => {
+  try {
+    const test = await Test.findById(req.params.id);
+    if (!test) return errorResponse(res, "Test not found.", 404);
+
+    const patient = await Patient.findOne({ user: req.user._id });
+    if (!patient || test.patient.toString() !== patient._id.toString()) {
+      return errorResponse(res, "Unauthorized.", 403);
+    }
+
+    if (["completed", "cancelled"].includes(test.status)) {
+      return errorResponse(res, `Cannot cancel test in ${test.status} status.`, 400);
+    }
+
+    test.status = "cancelled";
+    await test.save();
+
+    return successResponse(res, { test }, "Test cancelled.");
+  } catch (err) { next(err); }
+};
+
+module.exports = { orderTest, getMyTests, getTestById, updateTestStatus, collectSample, bookTest, cancelTest };

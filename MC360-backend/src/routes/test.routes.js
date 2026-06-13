@@ -8,6 +8,8 @@ router.use(protect);
 
 router.post("/", authorize("doctor", "hospital"), testController.orderTest);
 router.get("/", authorize("patient"), testController.getMyTests);
+router.post("/book", authorize("patient"), testController.bookTest);
+router.put("/:id/cancel", authorize("patient"), testController.cancelTest);
 router.get("/:id", testController.getTestById);
 router.put("/:id/status", authorize("hospital", "admin"), testController.updateTestStatus);
 router.post("/:id/collect-sample", authorize("hospital"), testController.collectSample);

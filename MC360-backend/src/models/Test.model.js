@@ -35,6 +35,8 @@ const testSchema = new mongoose.Schema(
     notes: String,
     sampleCollected: { type: Boolean, default: false },
     sampleCollectedAt: Date,
+    homeCollection: { type: Boolean, default: false },
+    collectionAddress: String,
   },
   { timestamps: true }
 );
