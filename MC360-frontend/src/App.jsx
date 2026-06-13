@@ -23,6 +23,7 @@ import PatientDashboard from './pages/patient/PatientDashboard'
 import BookAppointment from './pages/patient/BookAppointment'
 import BookTest from './pages/patient/BookTest'
 import MyAppointments from './pages/patient/MyAppointments'
+import MyTests from './pages/patient/MyTests'
 import MyReports from './pages/patient/MyReports'
 import MedicineTracker from './pages/patient/MedicineTracker'
 import HealthAnalytics from './pages/patient/HealthAnalytics'
@@ -69,6 +70,7 @@ export default function App() {
         <Route path="/patient/book-appointment" element={<BookAppointment />} />
         <Route path="/patient/book-test" element={<BookTest />} />
         <Route path="/patient/appointments" element={<MyAppointments />} />
+        <Route path="/patient/tests" element={<MyTests />} />
         <Route path="/patient/reports" element={<MyReports />} />
         <Route path="/patient/medicines" element={<MedicineTracker />} />
         <Route path="/patient/analytics" element={<HealthAnalytics />} />

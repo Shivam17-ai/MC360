@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Calendar, FileText, Pill, Activity, Brain, ArrowRight, Clock, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Calendar, FileText, Pill, Activity, Brain, ArrowRight, Clock, CheckCircle2, AlertCircle, FlaskConical } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { appointmentService } from '../../services/appointmentService'
 import { medicineService } from '../../services/medicineService'
+import { testService } from '../../services/testService'
 import { formatDateTime, smartDate } from '../../utils/formatDate'
 import Badge from '../../components/common/Badge'
 import { getStatusColor } from '../../utils/helpers'
@@ -20,6 +21,11 @@ export default function PatientDashboard() {
   const { data: medicines, isLoading: medLoading } = useQuery({
     queryKey: ['medicines'],
     queryFn: () => medicineService.getAll().then(r => r.data),
+  })
+  
+  const { data: tests, isLoading: testsLoading } = useQuery({
+    queryKey: ['tests', 'upcoming'],
+    queryFn: () => testService.getAll({ status: 'ordered', limit: 3 }).then(r => r.data),
   })
 
   const upcoming = appointments || []
@@ -45,8 +51,8 @@ export default function PatientDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Upcoming Appts', value: upcoming.length, icon: Calendar, bg: 'bg-primary-50', color: 'text-primary-600', to: '/patient/appointments' },
+          { label: 'Upcoming Tests', value: (tests || []).length, icon: FlaskConical, bg: 'bg-teal-50', color: 'text-teal-600', to: '/patient/tests' },
           { label: 'Active Medicines', value: todayMeds.length, icon: Pill, bg: 'bg-amber-50', color: 'text-amber-600', to: '/patient/medicines' },
-          { label: 'Reports', value: 0, icon: FileText, bg: 'bg-teal-50', color: 'text-teal-600', to: '/patient/reports' },
           { label: 'Health Score', value: '86', icon: Activity, bg: 'bg-emerald-50', color: 'text-emerald-600', to: '/patient/analytics' },
         ].map((stat) => (
           <Link key={stat.label} to={stat.to} className="stat-card hover:shadow-card-hover transition-shadow group">
@@ -129,7 +135,42 @@ export default function PatientDashboard() {
             </div>
           )}
         </div>
+
+        {/* Upcoming Tests */}
+        <div className="card p-5">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-base font-semibold text-slate-900">Upcoming Tests</h2>
+            <Link to="/patient/tests" className="text-xs text-primary-600 hover:underline flex items-center gap-1">
+              View all <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+          {testsLoading ? (
+            <div className="space-y-3"><CardSkeleton /><CardSkeleton /></div>
+          ) : (tests || []).length === 0 ? (
+            <div className="text-center py-8">
+              <FlaskConical className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p className="text-sm text-slate-400">No upcoming tests</p>
+              <Link to="/patient/book-test" className="text-xs text-primary-600 hover:underline mt-1 inline-block">Book a test →</Link>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {tests.map((test) => (
+                <div key={test._id} className="flex items-center gap-3 p-3 rounded-xl bg-surface-50">
+                  <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center shrink-0">
+                    <FlaskConical className="w-4 h-4 text-teal-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-900 truncate">{test.testName}</p>
+                    <p className="text-xs text-slate-400">{smartDate(test.scheduledDate)} · {test.category}</p>
+                  </div>
+                  <Badge variant="blue">{test.status}</Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+
 
       {/* Quick Actions */}
       <div className="card p-5">

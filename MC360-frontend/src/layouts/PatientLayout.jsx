@@ -6,6 +6,7 @@ const navItems = [
   { to: '/patient/book-appointment', label: 'Book Appointment', icon: Calendar },
   { to: '/patient/book-test', label: 'Book Test', icon: FlaskConical },
   { to: '/patient/appointments', label: 'My Appointments', icon: Calendar },
+  { to: '/patient/tests', label: 'My Tests', icon: FlaskConical },
   { to: '/patient/reports', label: 'Reports', icon: FileText },
   { to: '/patient/medicines', label: 'Medicines', icon: Pill },
   { to: '/patient/analytics', label: 'Health Analytics', icon: Activity },
