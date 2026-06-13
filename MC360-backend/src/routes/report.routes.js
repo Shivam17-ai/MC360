@@ -1,0 +1,19 @@
+const express = require("express");
+const router = express.Router();
+const reportController = require("../controllers/report.controller");
+const { protect } = require("../middlewares/auth.middleware");
+const { authorize } = require("../middlewares/role.middleware");
+const { upload } = require("../middlewares/upload.middleware");
+const { uploadLimiter } = require("../middlewares/rateLimiter.middleware");
+
+router.use(protect);
+
+router.post("/", uploadLimiter, upload.single("file"), reportController.uploadReport);
+router.get("/", authorize("patient"), reportController.getMyReports);
+router.get("/patient/:patientId", authorize("doctor", "hospital", "admin"), reportController.getPatientReports);
+router.get("/:id", reportController.getReportById);
+router.delete("/:id", reportController.deleteReport);
+router.post("/:id/summarize", reportController.summarizeReport);
+router.post("/:id/share", authorize("patient"), reportController.shareReport);
+
+module.exports = router;
