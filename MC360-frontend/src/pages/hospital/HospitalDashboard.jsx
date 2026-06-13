@@ -6,10 +6,17 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 export default function HospitalDashboard() {
   const { data: stats } = useQuery({
     queryKey: ['hospital-stats'],
-    queryFn: () => api.get('/hospital/stats').then(r => r.data),
+    queryFn: () => api.get('/hospitals/me/stats').then(r => r.data),
   })
 
   const s = stats || {}
+
+  const statCards = [
+    { label: 'Total Patients', value: s.totalPatients || '0', icon: Users, bg: 'bg-primary-50', color: 'text-primary-600', trend: '+5%' },
+    { label: 'Active Doctors', value: s.totalDoctors || '0', icon: UserCheck, bg: 'bg-teal-50', color: 'text-teal-600', trend: '' },
+    { label: "Today's Appointments", value: s.todayAppointments || '0', icon: Calendar, bg: 'bg-amber-50', color: 'text-amber-600', trend: '' },
+    { label: 'Emergency Alerts', value: s.emergencyAlerts || '0', icon: AlertTriangle, bg: 'bg-red-50', color: 'text-red-600', trend: '' },
+  ]
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -19,12 +26,7 @@ export default function HospitalDashboard() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Patients', value: s.totalPatients || '0', icon: Users, bg: 'bg-primary-50', color: 'text-primary-600', trend: '+12%' },
-          { label: 'Active Doctors', value: s.activeDoctors || '0', icon: UserCheck, bg: 'bg-teal-50', color: 'text-teal-600', trend: '+3' },
-          { label: "Today's Appointments", value: s.todayAppointments || '0', icon: Calendar, bg: 'bg-amber-50', color: 'text-amber-600', trend: '' },
-          { label: 'Emergency Alerts', value: s.emergencyAlerts || '0', icon: AlertTriangle, bg: 'bg-red-50', color: 'text-red-600', trend: '' },
-        ].map(stat => (
+        {statCards.map(stat => (
           <div key={stat.label} className="stat-card">
             <div className={`w-11 h-11 ${stat.bg} rounded-xl flex items-center justify-center shrink-0`}>
               <stat.icon className={`w-5 h-5 ${stat.color}`} />
