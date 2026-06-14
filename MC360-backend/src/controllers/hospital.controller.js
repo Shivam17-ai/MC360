@@ -3,6 +3,7 @@ const Doctor = require("../models/Doctor.model");
 const Patient = require("../models/Patient.model");
 const Appointment = require("../models/Appointment.model");
 const EmergencyAlert = require("../models/EmergencyAlert.model");
+const QueueToken = require("../models/QueueToken.model");
 const paginate = require("../utils/paginate");
 const { successResponse, errorResponse, paginatedResponse } = require("../utils/response");
 const { uploadToCloudinary, deleteFromCloudinary } = require("../middlewares/upload.middleware");
@@ -95,44 +96,83 @@ const getHospitalStats = async (req, res, next) => {
     if (!hospital) return errorResponse(res, "Hospital not found.", 404);
 
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const fourteenDaysAgo = new Date(); fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    const endOfToday = new Date(); endOfToday.setHours(23, 59, 59, 999);
+    const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const oneWeekAgo = new Date(); oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
-    const [totalDoctors, totalPatients, todayAppointments, emergencyAlerts, appointments] = await Promise.all([
+    const [totalDoctors, totalPatients, todayAppointments, emergencyAlerts, appointments, newPatientsWeek, tokensToday] = await Promise.all([
       Doctor.countDocuments({ $or: [{ hospital: hospital._id }, { _id: { $in: hospital.doctors } }] }),
       Patient.countDocuments({ hospital: hospital._id }),
-      Appointment.countDocuments({ hospital: hospital._id, date: { $gte: today } }),
+      Appointment.countDocuments({ hospital: hospital._id, date: { $gte: today, $lte: endOfToday } }),
       EmergencyAlert.countDocuments({ hospitalNotified: hospital._id, status: { $ne: "resolved" } }),
-      Appointment.find({ hospital: hospital._id, date: { $gte: fourteenDaysAgo } }).select("date")
+      Appointment.find({ hospital: hospital._id, date: { $gte: thirtyDaysAgo } }).select("date"),
+      Patient.countDocuments({ hospital: hospital._id, createdAt: { $gte: oneWeekAgo } }),
+      QueueToken.find({ hospital: hospital._id, date: { $gte: today }, calledAt: { $exists: true, $ne: null } }).select("date calledAt")
     ]);
 
-    // Trend calculation
+    // Trend calculation (30 days)
     const trendsMap = {};
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < 30; i++) {
       const d = new Date(); d.setDate(d.getDate() - i);
       trendsMap[d.toISOString().split('T')[0]] = 0;
     }
     appointments.forEach(a => {
-      const dStr = a.date.toISOString().split('T')[0];
-      if (trendsMap[dStr] !== undefined) trendsMap[dStr]++;
+      if (a.date) {
+        const dStr = a.date.toISOString().split('T')[0];
+        if (trendsMap[dStr] !== undefined) trendsMap[dStr]++;
+      }
     });
     const visitTrends = Object.keys(trendsMap).sort().map(date => ({
       date: date.split('-').slice(1).join('/'),
       visits: trendsMap[date]
     }));
 
-    // Department breakdown (simplified: based on doctor counts)
+    // Average wait time calculation from today's tokens
+    let avgWaitTime = 0;
+    if (tokensToday.length > 0) {
+      const totalWait = tokensToday.reduce((sum, t) => {
+        const waitMs = t.calledAt.getTime() - t.date.getTime();
+        return sum + Math.max(0, waitMs);
+      }, 0);
+      avgWaitTime = Math.round((totalWait / tokensToday.length) / 60000); // in minutes
+    }
+
+    // Dynamic Department breakdown (based on actual appointments with doctors of each specialization)
     const doctorsList = await Doctor.find({ hospital: hospital._id }).select("specialization");
     const deptMap = {};
+    const doctorToDept = {};
     doctorsList.forEach(d => {
       if (d.specialization) {
-        deptMap[d.specialization] = (deptMap[d.specialization] || 0) + 1;
+        deptMap[d.specialization] = 0;
+        doctorToDept[d._id.toString()] = d.specialization;
       }
     });
-    const departments = Object.keys(deptMap).map(name => ({
-      name,
-      count: deptMap[name] * 10, // dummy multiplier for activity
-      percent: Math.min(100, Math.floor(Math.random() * 40) + 30) // random visual percent
-    }));
+
+    const appointmentsList = await Appointment.find({
+      hospital: hospital._id,
+      doctor: { $in: doctorsList.map(d => d._id) }
+    }).select("doctor");
+
+    appointmentsList.forEach(a => {
+      if (a.doctor) {
+        const dept = doctorToDept[a.doctor.toString()];
+        if (dept !== undefined) {
+          deptMap[dept]++;
+        }
+      }
+    });
+
+    const totalDeptAppointments = Object.values(deptMap).reduce((a, b) => a + b, 0);
+
+    const departments = Object.keys(deptMap).map(name => {
+      const count = deptMap[name];
+      const percent = totalDeptAppointments > 0 ? Math.round((count / totalDeptAppointments) * 100) : 0;
+      return {
+        name,
+        count,
+        percent
+      };
+    });
 
     return successResponse(res, {
       totalDoctors,
@@ -143,7 +183,9 @@ const getHospitalStats = async (req, res, next) => {
       departments,
       availableBeds: hospital.availableBeds,
       totalBeds: hospital.totalBeds,
-      bedOccupancy: Math.round(((hospital.totalBeds - hospital.availableBeds) / hospital.totalBeds) * 100) || 0
+      bedOccupancy: Math.round(((hospital.totalBeds - hospital.availableBeds) / hospital.totalBeds) * 100) || 0,
+      avgWaitTime,
+      newPatientsWeek
     });
   } catch (err) { next(err); }
 };
