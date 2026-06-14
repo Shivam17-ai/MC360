@@ -76,10 +76,10 @@ export default function HospitalDashboard() {
           <h3 className="text-sm font-semibold text-slate-700 mb-4">Quick Summary</h3>
           <div className="space-y-3">
             {[
-              { label: 'Bed Occupancy', value: `${s.bedOccupancy || 72}%`, ok: true },
-              { label: 'Avg Wait Time', value: `${s.avgWaitTime || 18} mins` },
-              { label: 'Appointments Today', value: s.todayAppointments || 0 },
-              { label: 'New Patients (this week)', value: s.newPatientsWeek || 0 },
+              { label: 'Bed Occupancy', value: `${s.bedOccupancy !== undefined ? s.bedOccupancy : 72}%`, ok: true },
+              { label: 'Avg Wait Time', value: `${s.avgWaitTime !== undefined ? s.avgWaitTime : 18} mins` },
+              { label: 'Appointments Today', value: s.todayAppointments !== undefined ? s.todayAppointments : 0 },
+              { label: 'New Patients (this week)', value: s.newPatientsWeek !== undefined ? s.newPatientsWeek : 0 },
             ].map(item => (
               <div key={item.label} className="flex items-center justify-between px-3 py-2.5 bg-surface-50 rounded-xl">
                 <span className="text-sm text-slate-600">{item.label}</span>
