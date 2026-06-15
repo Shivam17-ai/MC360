@@ -24,7 +24,7 @@ const triggerAlert = async (req, res, next) => {
     // Broadcast via socket
     try {
       const io = require("../sockets").getIO();
-      if (io) io.emit("emergency_alert", { alert, patient: { name: patient.user.name, id: patient._id } });
+      if (io) io.emit("emergency:new", { alert, patient: { name: patient.user.name, id: patient._id } });
     } catch {}
 
     // Notify emergency contacts

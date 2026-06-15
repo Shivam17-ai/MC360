@@ -29,7 +29,7 @@ const createNotification = async ({
   try {
     const io = require("../sockets").getIO();
     if (io) {
-      io.to(`user_${userId}`).emit("notification", notification);
+      io.to(`user_${userId}`).emit("notification:new", notification);
     }
   } catch {}
 
