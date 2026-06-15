@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { dietService } from '../../services/dietService'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Salad, Zap, Plus, ChevronDown, ChevronUp, Download, IndianRupee, Sparkles, Clock, Utensils } from 'lucide-react'
 import Button from '../../components/common/Button'
 import toast from 'react-hot-toast'
@@ -9,6 +9,7 @@ const GOALS = ['Weight Loss', 'Weight Gain', 'Muscle Building', 'Diabetes Manage
 const DIET_TYPES = ['Vegetarian', 'Non-Vegetarian', 'Vegan', 'Eggetarian', 'Gluten-Free']
 
 export default function DietPlanner() {
+  const queryClient = useQueryClient()
   const [goal, setGoal] = useState('')
   const [dietType, setDietType] = useState('')
   const [allergies, setAllergies] = useState('')
@@ -16,6 +17,35 @@ export default function DietPlanner() {
   const [generating, setGenerating] = useState(false)
   const [plan, setPlan] = useState(null)
   const [expandedDay, setExpandedDay] = useState(0)
+
+  const { data: activePlan } = useQuery({
+    queryKey: ['active-diet-plan'],
+    queryFn: () => dietService.getActivePlan().then(r => r.data.plan),
+  })
+
+  useEffect(() => {
+    if (activePlan && !plan) {
+      setPlan(activePlan)
+      if (activePlan.goal) {
+        const matchingGoal = GOALS.find(
+          g =>
+            g.toLowerCase() === activePlan.goal.toLowerCase() ||
+            g.replace(' ', '-').toLowerCase() === activePlan.goal.toLowerCase()
+        )
+        if (matchingGoal) setGoal(matchingGoal)
+      }
+      if (activePlan.dietType) {
+        const matchingDiet = DIET_TYPES.find(d => d.toLowerCase() === activePlan.dietType.toLowerCase())
+        if (matchingDiet) setDietType(matchingDiet)
+      }
+      if (activePlan.totalCalories) {
+        setCalories(String(activePlan.totalCalories))
+      }
+      if (activePlan.restrictions && activePlan.restrictions.length > 0) {
+        setAllergies(activePlan.restrictions.join(', '))
+      }
+    }
+  }, [activePlan, plan])
 
   const { data: savedPlans } = useQuery({
     queryKey: ['diet-plans'],
@@ -31,6 +61,8 @@ export default function DietPlanner() {
       // api.js extracts res.data
       setPlan(res.data.plan)
       toast.success('Indian meal plan generated!')
+      queryClient.invalidateQueries({ queryKey: ['active-diet-plan'] })
+      queryClient.invalidateQueries({ queryKey: ['diet-plans'] })
     } catch (e) {
       toast.error(e.message)
     } finally {
@@ -207,6 +239,30 @@ export default function DietPlanner() {
                         <Clock className="w-3 h-3 text-emerald-500" /> 7-Day Schedule
                       </span>
                     </div>
+                    {plan.macros && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {plan.macros.protein && (
+                          <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-bold rounded-lg border border-amber-100">
+                            Protein: {plan.macros.protein}g
+                          </span>
+                        )}
+                        {plan.macros.carbs && (
+                          <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded-lg border border-blue-100">
+                            Carbs: {plan.macros.carbs}g
+                          </span>
+                        )}
+                        {plan.macros.fat && (
+                          <span className="px-2 py-0.5 bg-rose-50 text-rose-700 text-[10px] font-bold rounded-lg border border-rose-100">
+                            Fat: {plan.macros.fat}g
+                          </span>
+                        )}
+                        {plan.macros.fiber && (
+                          <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-lg border border-emerald-100">
+                            Fiber: {plan.macros.fiber}g
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="hidden md:flex flex-col items-end">
