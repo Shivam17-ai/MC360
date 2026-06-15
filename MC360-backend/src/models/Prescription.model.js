@@ -33,8 +33,17 @@ const prescriptionSchema = new mongoose.Schema(
 
 prescriptionSchema.pre("save", async function (next) {
   if (!this.prescriptionId) {
-    const count = await mongoose.model("Prescription").countDocuments();
-    this.prescriptionId = `MC360-RX-${String(count + 1).padStart(6, "0")}`;
+    const lastDoc = await mongoose.model("Prescription")
+      .findOne({}, { prescriptionId: 1 })
+      .sort({ prescriptionId: -1 });
+    let nextNum = 1;
+    if (lastDoc && lastDoc.prescriptionId) {
+      const match = lastDoc.prescriptionId.match(/MC360-RX-(\d+)/);
+      if (match) {
+        nextNum = parseInt(match[1], 10) + 1;
+      }
+    }
+    this.prescriptionId = `MC360-RX-${String(nextNum).padStart(6, "0")}`;
   }
   next();
 });

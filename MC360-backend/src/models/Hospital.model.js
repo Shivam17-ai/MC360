@@ -54,8 +54,17 @@ const hospitalSchema = new mongoose.Schema(
 
 hospitalSchema.pre("save", async function (next) {
   if (!this.hospitalId) {
-    const count = await mongoose.model("Hospital").countDocuments();
-    this.hospitalId = `MC360-H-${String(count + 1).padStart(5, "0")}`;
+    const lastDoc = await mongoose.model("Hospital")
+      .findOne({}, { hospitalId: 1 })
+      .sort({ hospitalId: -1 });
+    let nextNum = 1;
+    if (lastDoc && lastDoc.hospitalId) {
+      const match = lastDoc.hospitalId.match(/MC360-H-(\d+)/);
+      if (match) {
+        nextNum = parseInt(match[1], 10) + 1;
+      }
+    }
+    this.hospitalId = `MC360-H-${String(nextNum).padStart(5, "0")}`;
   }
   next();
 });

@@ -38,8 +38,17 @@ const emergencyAlertSchema = new mongoose.Schema(
 
 emergencyAlertSchema.pre("save", async function (next) {
   if (!this.alertId) {
-    const count = await mongoose.model("EmergencyAlert").countDocuments();
-    this.alertId = `MC360-E-${String(count + 1).padStart(6, "0")}`;
+    const lastDoc = await mongoose.model("EmergencyAlert")
+      .findOne({}, { alertId: 1 })
+      .sort({ alertId: -1 });
+    let nextNum = 1;
+    if (lastDoc && lastDoc.alertId) {
+      const match = lastDoc.alertId.match(/MC360-E-(\d+)/);
+      if (match) {
+        nextNum = parseInt(match[1], 10) + 1;
+      }
+    }
+    this.alertId = `MC360-E-${String(nextNum).padStart(6, "0")}`;
   }
   next();
 });

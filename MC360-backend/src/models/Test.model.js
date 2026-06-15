@@ -43,8 +43,17 @@ const testSchema = new mongoose.Schema(
 
 testSchema.pre("save", async function (next) {
   if (!this.testId) {
-    const count = await mongoose.model("Test").countDocuments();
-    this.testId = `MC360-T-${String(count + 1).padStart(6, "0")}`;
+    const lastDoc = await mongoose.model("Test")
+      .findOne({}, { testId: 1 })
+      .sort({ testId: -1 });
+    let nextNum = 1;
+    if (lastDoc && lastDoc.testId) {
+      const match = lastDoc.testId.match(/MC360-T-(\d+)/);
+      if (match) {
+        nextNum = parseInt(match[1], 10) + 1;
+      }
+    }
+    this.testId = `MC360-T-${String(nextNum).padStart(6, "0")}`;
   }
   next();
 });

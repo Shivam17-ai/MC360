@@ -39,8 +39,17 @@ const appointmentSchema = new mongoose.Schema(
 
 appointmentSchema.pre("save", async function (next) {
   if (!this.appointmentId) {
-    const count = await mongoose.model("Appointment").countDocuments();
-    this.appointmentId = `MC360-A-${String(count + 1).padStart(7, "0")}`;
+    const lastDoc = await mongoose.model("Appointment")
+      .findOne({}, { appointmentId: 1 })
+      .sort({ appointmentId: -1 });
+    let nextNum = 1;
+    if (lastDoc && lastDoc.appointmentId) {
+      const match = lastDoc.appointmentId.match(/MC360-A-(\d+)/);
+      if (match) {
+        nextNum = parseInt(match[1], 10) + 1;
+      }
+    }
+    this.appointmentId = `MC360-A-${String(nextNum).padStart(7, "0")}`;
   }
   next();
 });

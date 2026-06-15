@@ -58,8 +58,17 @@ const patientSchema = new mongoose.Schema(
 // Auto-generate patientId
 patientSchema.pre("save", async function (next) {
   if (!this.patientId) {
-    const count = await mongoose.model("Patient").countDocuments();
-    this.patientId = `P-${String(count + 1).padStart(5, "0")}`;
+    const lastDoc = await mongoose.model("Patient")
+      .findOne({}, { patientId: 1 })
+      .sort({ patientId: -1 });
+    let nextNum = 1;
+    if (lastDoc && lastDoc.patientId) {
+      const match = lastDoc.patientId.match(/P-(\d+)/);
+      if (match) {
+        nextNum = parseInt(match[1], 10) + 1;
+      }
+    }
+    this.patientId = `P-${String(nextNum).padStart(5, "0")}`;
   }
   if (this.dateOfBirth && !this.age) {
     this.age = Math.floor(

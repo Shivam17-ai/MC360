@@ -38,8 +38,17 @@ const reportSchema = new mongoose.Schema(
 
 reportSchema.pre("save", async function (next) {
   if (!this.reportId) {
-    const count = await mongoose.model("Report").countDocuments();
-    this.reportId = `MC360-R-${String(count + 1).padStart(6, "0")}`;
+    const lastDoc = await mongoose.model("Report")
+      .findOne({}, { reportId: 1 })
+      .sort({ reportId: -1 });
+    let nextNum = 1;
+    if (lastDoc && lastDoc.reportId) {
+      const match = lastDoc.reportId.match(/MC360-R-(\d+)/);
+      if (match) {
+        nextNum = parseInt(match[1], 10) + 1;
+      }
+    }
+    this.reportId = `MC360-R-${String(nextNum).padStart(6, "0")}`;
   }
   next();
 });

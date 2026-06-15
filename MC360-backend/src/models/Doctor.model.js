@@ -48,8 +48,17 @@ const doctorSchema = new mongoose.Schema(
 
 doctorSchema.pre("save", async function (next) {
   if (!this.doctorId) {
-    const count = await mongoose.model("Doctor").countDocuments();
-    this.doctorId = `MC360-D-${String(count + 1).padStart(5, "0")}`;
+    const lastDoc = await mongoose.model("Doctor")
+      .findOne({}, { doctorId: 1 })
+      .sort({ doctorId: -1 });
+    let nextNum = 1;
+    if (lastDoc && lastDoc.doctorId) {
+      const match = lastDoc.doctorId.match(/MC360-D-(\d+)/);
+      if (match) {
+        nextNum = parseInt(match[1], 10) + 1;
+      }
+    }
+    this.doctorId = `MC360-D-${String(nextNum).padStart(5, "0")}`;
   }
   next();
 });
