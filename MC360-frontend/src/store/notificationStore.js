@@ -8,8 +8,10 @@ export const useNotificationStore = create((set, get) => ({
   fetch: async () => {
     try {
       const res = await notificationService.getAll()
-      const list = res.data || []
-      set({ notifications: list, unreadCount: list.filter((n) => !n.isRead).length })
+      // axios interceptor returns res.data, so res = { success, data: { notifications, unreadCount, ... } }
+      const list = res.data?.notifications || []
+      const unread = res.data?.unreadCount ?? list.filter((n) => !n.isRead).length
+      set({ notifications: list, unreadCount: unread })
     } catch {}
   },
 
