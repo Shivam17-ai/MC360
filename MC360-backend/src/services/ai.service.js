@@ -137,26 +137,73 @@ const summarizeReport = async (reportText, reportType = "lab-report") => {
 
 // ── Diet Plan Generator ───────────────────────────────────────────────────────
 const generateDietPlan = async (patientData) => {
+  const formatList = (val) => {
+    if (!val) return "none";
+    if (Array.isArray(val)) return val.length > 0 ? val.join(", ") : "none";
+    if (typeof val === "string") return val.trim() || "none";
+    return String(val);
+  };
+
+  const target = patientData.targetCalories || 2000;
+  const bCal = Math.round(target * 0.25);
+  const lCal = Math.round(target * 0.35);
+  const sCal = Math.round(target * 0.10);
+  const dCal = Math.round(target * 0.30);
+
   const systemPrompt = `You are a clinical nutritionist AI specializing in Indian cuisine. Generate a highly personalized 7-day Indian diet plan in JSON format.
-  Focus on local ingredients like Dal, Poha, Roti, Sabzi, Idli, etc., based on the user's diet type.`;
+  Analyze the patient's profile, health goals, diet type, allergies, and chronic medical conditions.
   
-  const userPrompt = `Patient Profile: Age ${patientData.age || 'unknown'}, Goal: ${patientData.goal}, Diet Type: ${patientData.dietType}, Allergies: ${patientData.allergies || 'none'}, Calories: ${patientData.targetCalories} kcal.
-  
-  Return this exact JSON structure:
+  CRITICAL RULES:
+  1. Diet Type Restrictions:
+     - "Vegetarian": Strictly NO meat, fish, seafood, or eggs. Dairy (milk, curd, paneer, ghee) is allowed.
+     - "Vegan": Strictly NO animal products (no meat, fish, eggs, dairy, honey, ghee, curd).
+     - "Eggetarian": NO meat or fish, but eggs are allowed. Dairy is allowed.
+     - "Non-Vegetarian": Meat, fish, eggs, and dairy are allowed.
+     - "Gluten-Free": Strictly NO wheat, barley, rye, or semolina (suji/sooji). Use rice, millets (ragi, jowar, bajra), oats, or quinoa instead.
+  2. Allergies & Restrictions: Strictly exclude any ingredients matching the patient's allergies/restrictions: ${formatList(patientData.allergies)} / ${formatList(patientData.restrictions)}.
+  3. Medical/Health Goals & Chronic Conditions:
+     - Adjust macronutrient and ingredient selections based on the conditions: ${formatList(patientData.conditions)}.
+     - If Diabetes: avoid high glycemic index foods, restrict sugar.
+     - If Hypertension/Heart Health: focus on low-sodium, heart-healthy fats.
+     - Adjust protein/carb ratios based on Goal: ${patientData.goal}.
+  4. Calorie Math Constraint:
+     - The meals for each day must target these calorie levels: Breakfast (${bCal} kcal), Lunch (${lCal} kcal), Snack (${sCal} kcal), and Dinner (${dCal} kcal).
+     - The sum of these four meals MUST be exactly ${target} kcal (or within +/- 10 kcal). The day's "totalCalories" field must be the exact sum of these four meals.
+  5. Variety: Provide diverse, distinct, and creative meal options for each of the 7 days (Day 1 to Day 7). Do not repeat the same meals on consecutive or alternate days. Use a wide range of Indian dishes.`;
+
+  const userPrompt = `Generate a 7-day Indian diet plan for this patient profile:
+  - Age: ${patientData.age || 'unknown'}
+  - Gender: ${patientData.gender || 'unknown'}
+  - Weight: ${patientData.weight || 'unknown'} kg
+  - Height: ${patientData.height || 'unknown'} cm
+  - Goal: ${patientData.goal}
+  - Diet Type: ${patientData.dietType}
+  - Chronic Conditions: ${formatList(patientData.conditions)}
+  - Allergies: ${formatList(patientData.allergies)}
+  - Target Calories: ${target} kcal per day
+
+  Return a JSON object with this exact structure:
   {
-    "title": "7-Day Indian Meal Plan",
-    "totalCalories": ${patientData.targetCalories},
+    "title": "personalized title description here",
+    "totalCalories": ${target},
+    "macros": {
+      "protein": [estimated daily protein in grams],
+      "carbs": [estimated daily carbs in grams],
+      "fat": [estimated daily fat in grams],
+      "fiber": [estimated daily fiber in grams]
+    },
     "days": [
       {
-        "totalCalories": 1800,
-        "breakfast": { "name": "e.g. Masala Poha", "description": "1 bowl with peanuts and lemon", "calories": 350 },
-        "lunch": { "name": "e.g. Dal Tadka & Bhindi Sabzi", "description": "2 phulkas with 1 bowl dal", "calories": 550 },
-        "snack": { "name": "e.g. Roasted Makhana", "description": "Handful with green tea", "calories": 150 },
-        "dinner": { "name": "e.g. Khichdi", "description": "1 bowl with curd", "calories": 450 }
+        "totalCalories": [must equal the sum of breakfast, lunch, snack, and dinner calories, which must be exactly ${target}],
+        "breakfast": { "name": "meal name", "description": "meal description", "calories": ${bCal} },
+        "lunch": { "name": "meal name", "description": "meal description", "calories": ${lCal} },
+        "snack": { "name": "meal name", "description": "meal description", "calories": ${sCal} },
+        "dinner": { "name": "meal name", "description": "meal description", "calories": ${dCal} }
       }
     ]
   }
-  Ensure there are exactly 7 days in the "days" array. Respond ONLY with valid JSON.`;
+
+  The "days" array MUST contain exactly 7 objects, representing Day 1 to Day 7. Respond ONLY with valid JSON.`;
 
   try {
     const messages = [
