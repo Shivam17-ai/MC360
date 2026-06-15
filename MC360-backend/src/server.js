@@ -15,6 +15,7 @@ const env = require("./config/env");
 // Background jobs
 const medicineReminderJob = require("./jobs/medicineReminder.job");
 const appointmentReminderJob = require("./jobs/appointmentReminder.job");
+const appointmentCancelJob = require("./jobs/appointmentCancel.job");
 const healthAlertJob = require("./jobs/healthAlert.job");
 
 const server = http.createServer(app);
@@ -46,6 +47,7 @@ const startServer = async () => {
     // Start cron jobs
     medicineReminderJob.start();
     appointmentReminderJob.start();
+    appointmentCancelJob.start();
     healthAlertJob.start();
     logger.info("Background jobs started.");
 
