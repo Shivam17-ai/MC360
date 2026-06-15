@@ -157,7 +157,7 @@ export default function BookAppointment() {
               <label className="label-base">Select Date</label>
               <input
                 type="date"
-                min={new Date().toISOString().split('T')[0]}
+                min={new Date().toLocaleDateString('en-CA')}
                 value={selectedDate}
                 onChange={e => setSelectedDate(e.target.value)}
                 className="input-base"
