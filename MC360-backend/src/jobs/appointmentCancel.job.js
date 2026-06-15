@@ -33,33 +33,32 @@ const checkAndCancelExpiredAppointments = async () => {
         const month = appointmentDate.getUTCMonth();
         const date = appointmentDate.getUTCDate();
 
-        const endDateTime = new Date(year, month, date, hours, minutes, 0, 0);
+        // Use UTC consistently to avoid timezone mismatch
+        const endDateTime = new Date(Date.UTC(year, month, date, hours, minutes, 0, 0));
 
         if (endDateTime < now) {
-          appt.status = "cancelled";
-          appt.cancelledBy = "system";
-          appt.cancelReason = "Appointment time slot passed without completion.";
+          appt.status = "completed";
           await appt.save();
           cancelledCount++;
 
           if (appt.patient && appt.patient.user) {
             await createNotification({
               userId: appt.patient.user._id,
-              title: "Appointment Expired ❌",
-              message: `Your appointment with Dr. ${appt.doctor?.user?.name || "your doctor"} on ${new Date(appt.date).toLocaleDateString()} at ${appt.timeSlot} has been automatically cancelled because the scheduled time passed.`,
+              title: "Appointment Completed ✅",
+              message: `Your appointment with Dr. ${appt.doctor?.user?.name || "your doctor"} on ${new Date(appt.date).toLocaleDateString()} at ${appt.timeSlot} has been marked as completed.`,
               type: "appointment",
-              priority: "medium",
+              priority: "low",
               data: { appointmentId: appt._id }
             });
           }
         }
       } catch (err) {
-        logger.error(`Failed to auto-cancel appointment ${appt._id}: ${err.message}`);
+        logger.error(`Failed to auto-complete appointment ${appt._id}: ${err.message}`);
       }
     }
 
     if (cancelledCount > 0) {
-      logger.info(`Auto-cancelled ${cancelledCount} passed appointments.`);
+      logger.info(`Auto-completed ${cancelledCount} past appointments.`);
     }
   } catch (err) {
     logger.error(`Appointment auto-cancellation job error: ${err.message}`);
