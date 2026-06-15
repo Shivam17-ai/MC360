@@ -22,7 +22,7 @@ export default function PatientDashboard() {
     queryKey: ['medicines'],
     queryFn: () => medicineService.getAll().then(r => r.data),
   })
-  
+
   const { data: tests, isLoading: testsLoading } = useQuery({
     queryKey: ['tests', 'upcoming'],
     queryFn: () => testService.getAll({ status: 'ordered', limit: 3 }).then(r => r.data),
