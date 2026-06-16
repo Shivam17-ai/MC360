@@ -32,8 +32,6 @@ export default function MyAppointments() {
     staleTime: 0,
     queryFn: async () => {
       const body = await appointmentService.getAll({ status: TAB_STATUS_MAP[activeTab] })
-      console.log('🔍 [MyAppointments] raw body:', body)
-      console.log('🔍 [MyAppointments] body.data:', body?.data)
       if (Array.isArray(body?.data)) return body.data
       if (Array.isArray(body)) return body
       return []
