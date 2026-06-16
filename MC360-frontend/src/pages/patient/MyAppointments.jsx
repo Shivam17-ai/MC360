@@ -27,9 +27,17 @@ export default function MyAppointments() {
   const qc = useQueryClient()
   const navigate = useNavigate()
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ['appointments', activeTab],
-    queryFn: () => appointmentService.getAll({ status: TAB_STATUS_MAP[activeTab] }).then(r => r.data),
+    staleTime: 0,
+    queryFn: async () => {
+      const body = await appointmentService.getAll({ status: TAB_STATUS_MAP[activeTab] })
+      console.log('🔍 [MyAppointments] raw body:', body)
+      console.log('🔍 [MyAppointments] body.data:', body?.data)
+      if (Array.isArray(body?.data)) return body.data
+      if (Array.isArray(body)) return body
+      return []
+    },
   })
 
   const cancel = useMutation({
@@ -42,7 +50,7 @@ export default function MyAppointments() {
     onError: (e) => toast.error(e.message),
   })
 
-  const appointments = data || []
+  const appointments = Array.isArray(data) ? data : []
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -66,7 +74,12 @@ export default function MyAppointments() {
 
       {/* List */}
       <div className="space-y-3">
-        {isLoading ? (
+        {error ? (
+          <div className="card p-8 text-center border border-red-200 bg-red-50">
+            <p className="text-red-600 font-medium">Error loading appointments</p>
+            <p className="text-red-400 text-sm mt-1">{error.message}</p>
+          </div>
+        ) : isLoading ? (
           Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="card p-5">
               <div className="flex gap-4">
