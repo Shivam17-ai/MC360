@@ -46,20 +46,18 @@ const bookAppointment = async ({
     status: "confirmed",
   });
 
-  // Notifications (non-blocking)
-  try {
-    await createNotification({
-      userId: patientUserId,
-      title: "Appointment Confirmed",
-      message: `Your appointment with Dr. ${doctor.user.name} on ${new Date(date).toLocaleDateString()} at ${timeSlot} is confirmed.`,
-      type: "appointment",
-      data: { appointmentId: appointment._id },
-    });
+  // Fire-and-forget notifications — do NOT await, they must never block the HTTP response.
+  // On cloud deployments, email/whatsapp services can hang indefinitely with no timeout.
+  createNotification({
+    userId: patientUserId,
+    title: "Appointment Confirmed",
+    message: `Your appointment with Dr. ${doctor.user.name} on ${new Date(date).toLocaleDateString()} at ${timeSlot} is confirmed.`,
+    type: "appointment",
+    data: { appointmentId: appointment._id },
+  }).catch(err => logger.warn(`createNotification failed: ${err.message}`));
 
-    await sendAppointmentConfirmation(patient.user, appointment);
-  } catch (err) {
-    logger.warn(`Post-booking notifications failed: ${err.message}`);
-  }
+  sendAppointmentConfirmation(patient.user, appointment)
+    .catch(err => logger.warn(`sendAppointmentConfirmation failed: ${err.message}`));
 
   // Populate and return — fall back to unpopulated if populate fails
   try {
