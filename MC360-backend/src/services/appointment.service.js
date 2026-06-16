@@ -46,7 +46,7 @@ const bookAppointment = async ({
     status: "confirmed",
   });
 
-  // Notifications
+  // Notifications (non-blocking)
   try {
     await createNotification({
       userId: patientUserId,
@@ -61,11 +61,17 @@ const bookAppointment = async ({
     logger.warn(`Post-booking notifications failed: ${err.message}`);
   }
 
-  return appointment.populate([
-    { path: "doctor", populate: { path: "user", select: "name email phone avatar" } },
-    { path: "patient", populate: { path: "user", select: "name email phone" } },
-    { path: "hospital", select: "name address phone" },
-  ]);
+  // Populate and return — fall back to unpopulated if populate fails
+  try {
+    return await appointment.populate([
+      { path: "doctor", populate: { path: "user", select: "name email phone avatar" } },
+      { path: "patient", populate: { path: "user", select: "name email phone" } },
+      { path: "hospital", select: "name address phone" },
+    ]);
+  } catch (err) {
+    logger.warn(`Appointment populate failed: ${err.message}`);
+    return appointment;
+  }
 };
 
 const cancelAppointment = async (appointmentId, userId, reason) => {
