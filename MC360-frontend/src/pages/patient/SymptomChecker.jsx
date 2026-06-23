@@ -55,13 +55,11 @@ export default function SymptomCheckerPage() {
   }
 
   // Chat logic
-  const handleChatSend = async (e) => {
-    e?.preventDefault()
-    if (!chatInput.trim() || chatLoading) return
+  const sendChatMessage = async (text) => {
+    if (!text.trim() || chatLoading) return
 
-    const userMessage = { role: 'user', content: chatInput }
+    const userMessage = { role: 'user', content: text }
     setMessages(prev => [...prev, userMessage])
-    setChatInput('')
     setChatLoading(true)
 
     try {
@@ -73,6 +71,14 @@ export default function SymptomCheckerPage() {
     } finally {
       setChatLoading(false)
     }
+  }
+
+  const handleChatSend = async (e) => {
+    e?.preventDefault()
+    if (!chatInput.trim() || chatLoading) return
+    const textToSend = chatInput
+    setChatInput('')
+    await sendChatMessage(textToSend)
   }
 
   const riskVariant = { low: 'green', moderate: 'yellow', high: 'red' }
@@ -278,8 +284,17 @@ export default function SymptomCheckerPage() {
                 <div className={clsx("w-8 h-8 rounded-full flex items-center justify-center shrink-0", m.role === 'user' ? "bg-slate-100 text-slate-500" : "bg-primary-50 text-primary-500")}>
                   {m.role === 'user' ? <User className="w-4 h-4" /> : <Brain className="w-4 h-4" />}
                 </div>
-                <div className={clsx("max-w-[80%] p-3.5 rounded-2xl text-sm leading-relaxed", m.role === 'user' ? "bg-primary-600 text-white rounded-tr-none" : "bg-surface-100 text-slate-700 rounded-tl-none")}>
-                  {m.content}
+                <div className={clsx("max-w-[80%] p-3.5 rounded-2xl text-sm leading-relaxed", m.role === 'user' ? "bg-primary-600 text-white rounded-tr-none" : "bg-surface-100 text-slate-700 rounded-tl-none shadow-sm border border-slate-100")}>
+                  {m.role === 'user' ? (
+                    m.content
+                  ) : (
+                    <InteractiveMessage
+                      content={m.content}
+                      onSend={sendChatMessage}
+                      onAppend={(text) => setChatInput(prev => prev ? `${prev}, ${text}` : text)}
+                      chatLoading={chatLoading}
+                    />
+                  )}
                 </div>
               </div>
             ))}
@@ -339,5 +354,167 @@ function Activity(props) {
     >
       <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
     </svg>
+  )
+}
+
+function InteractiveMessage({ content, onSend, onAppend, chatLoading }) {
+  const [selected, setSelected] = useState([])
+
+  const parseContent = (text) => {
+    if (!text) return []
+
+    // Normalize inline markers like '* ' or '+ ' or '- ' to newlines if mashed together
+    const normalized = text
+      .replace(/(?:\s+|\n|^)\*(?=\s)/g, '\n*')
+      .replace(/(?:\s+|\n|^)\+(?=\s)/g, '\n+')
+      .replace(/(?:\s+|\n|^)-(?=\s)/g, '\n-')
+
+    const lines = normalized.split('\n')
+    const blocks = []
+    let currentChips = null
+
+    lines.forEach(line => {
+      const trimmed = line.trim()
+      if (!trimmed) return
+
+      if (trimmed.startsWith('+')) {
+        const value = trimmed.substring(1).trim()
+        if (value) {
+          if (!currentChips) {
+            currentChips = { type: 'chips', items: [] }
+            blocks.push(currentChips)
+          }
+          currentChips.items.push(value)
+        }
+      } else {
+        currentChips = null
+        
+        if (trimmed.startsWith('*') || trimmed.startsWith('-')) {
+          const value = trimmed.substring(1).trim()
+          if (value) {
+            blocks.push({ type: 'bullet', text: value })
+          }
+        } else {
+          blocks.push({ type: 'paragraph', text: trimmed })
+        }
+      }
+    })
+
+    return blocks
+  }
+
+  const blocks = parseContent(content)
+
+  const toggleSelect = (item) => {
+    setSelected(prev => 
+      prev.includes(item) ? prev.filter(x => x !== item) : [...prev, item]
+    )
+  }
+
+  const renderTextWithFormatting = (text) => {
+    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g)
+    return parts.map((part, index) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={index} className="font-semibold text-slate-900">{part.slice(2, -2)}</strong>
+      }
+      if (part.startsWith('*') && part.endsWith('*')) {
+        return <strong key={index} className="font-semibold text-slate-900">{part.slice(1, -1)}</strong>
+      }
+      return part
+    })
+  }
+
+  const handleSendReply = () => {
+    if (selected.length === 0) return
+    const replyText = `I am experiencing: ${selected.join(', ')}`
+    onSend(replyText)
+    setSelected([])
+  }
+
+  const handleAddToInput = () => {
+    if (selected.length === 0) return
+    onAppend(selected.join(', '))
+  }
+
+  return (
+    <div className="space-y-3">
+      {blocks.map((block, idx) => {
+        if (block.type === 'paragraph') {
+          return (
+            <p key={idx} className="text-slate-700 leading-relaxed">
+              {renderTextWithFormatting(block.text)}
+            </p>
+          )
+        }
+        if (block.type === 'bullet') {
+          return (
+            <div key={idx} className="flex gap-2.5 items-start pl-1 my-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary-500 mt-2 shrink-0 animate-pulse" />
+              <p className="text-slate-700 leading-relaxed flex-1">
+                {renderTextWithFormatting(block.text)}
+              </p>
+            </div>
+          )
+        }
+        if (block.type === 'chips') {
+          return (
+            <div key={idx} className="flex flex-wrap gap-2 my-3 pl-4">
+              {block.items.map((item, itemIdx) => {
+                const isSelected = selected.includes(item)
+                return (
+                  <button
+                    key={itemIdx}
+                    onClick={() => toggleSelect(item)}
+                    className={clsx(
+                      "px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all duration-200 flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95",
+                      isSelected 
+                        ? "bg-primary-600 border-primary-600 text-white shadow-md shadow-primary-100" 
+                        : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
+                    )}
+                  >
+                    <span className={clsx(
+                      "w-3.5 h-3.5 rounded flex items-center justify-center shrink-0 border transition-colors",
+                      isSelected ? "border-white bg-white/20" : "border-slate-300"
+                    )}>
+                      {isSelected && (
+                        <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </span>
+                    {item}
+                  </button>
+                )
+              })}
+            </div>
+          )
+        }
+        return null
+      })}
+
+      {selected.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-3 pt-3 border-t border-slate-200/80 animate-fade-in">
+          <p className="text-xs text-slate-500 font-medium italic">
+            Selected: <span className="text-primary-700 font-bold">{selected.length}</span> {selected.length === 1 ? 'item' : 'items'}
+          </p>
+          <div className="flex gap-2 self-end sm:self-auto">
+            <button
+              onClick={handleAddToInput}
+              disabled={chatLoading}
+              className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-all duration-150 border border-slate-200"
+            >
+              Add to input
+            </button>
+            <button
+              onClick={handleSendReply}
+              disabled={chatLoading}
+              className="px-3 py-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold rounded-lg transition-all duration-150 shadow-md shadow-primary-100 flex items-center gap-1"
+            >
+              Send response
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
