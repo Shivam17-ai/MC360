@@ -37,7 +37,7 @@ export default function BookAppointment() {
     keepPreviousData: true,
   })
 
-  const { data: slots, isLoading: slotsLoading } = useQuery({
+  const slotsQ = useQuery({
     queryKey: ['slots', selectedDoctor?._id, selectedDate],
     queryFn: () =>
       appointmentService
@@ -45,10 +45,13 @@ export default function BookAppointment() {
         .then(r => {
           // successResponse wraps as: r.data = { success, data: { availability: { slots } } }
           const inner = r?.data?.data ?? r?.data ?? {}
-          return inner.availability?.slots ?? inner.slots ?? []
+          return inner.availability ?? inner ?? {}
         }),
     enabled: !!selectedDoctor && !!selectedDate,
   })
+
+  const slots = slotsQ.data?.slots || []
+  const slotsLoading = slotsQ.isLoading
 
   const book = useMutation({
     mutationFn: appointmentService.create,
@@ -234,6 +237,11 @@ export default function BookAppointment() {
               <input
                 type="date"
                 min={new Date().toLocaleDateString('en-CA')}
+                max={(() => {
+                  const d = new Date()
+                  d.setDate(d.getDate() + 6)
+                  return d.toLocaleDateString('en-CA')
+                })()}
                 value={selectedDate}
                 onChange={e => setSelectedDate(e.target.value)}
                 className="input-base"
@@ -256,8 +264,8 @@ export default function BookAppointment() {
                     ))}
                   </div>
                 ) : !slots?.length ? (
-                  <p className="text-xs text-slate-400">
-                    No slots available
+                  <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg p-3 font-medium">
+                    {slotsQ.data?.message || 'No slots available'}
                   </p>
                 ) : (
                   <div className="grid grid-cols-3 gap-2">

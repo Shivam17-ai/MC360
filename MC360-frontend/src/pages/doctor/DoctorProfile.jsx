@@ -23,6 +23,7 @@ export default function DoctorProfile() {
     qualification: '',
     consultationFee: '',
     bio: '',
+    weekendAvailability: false,
   })
 
   // Fetch doctor profile on mount
@@ -39,6 +40,7 @@ export default function DoctorProfile() {
           qualification: doctor.qualifications?.[0] || '',
           consultationFee: doctor.consultationFee || '',
           bio: doctor.biography || '',
+          weekendAvailability: doctor.weekendAvailability || false,
         }))
       } catch (e) {
         console.error('Failed to load doctor profile:', e)
@@ -48,6 +50,7 @@ export default function DoctorProfile() {
   }, [])
 
   const handleChange = e => setForm(p => ({ ...p, [e.target.name]: e.target.value }))
+  const handleToggleWeekend = () => setForm(p => ({ ...p, weekendAvailability: !p.weekendAvailability }))
 
   const handleSave = async () => {
     setLoading(true)
@@ -65,6 +68,7 @@ export default function DoctorProfile() {
         qualifications: form.qualification ? [form.qualification] : [],
         consultationFee: parseFloat(form.consultationFee) || 0,
         biography: form.bio,
+        weekendAvailability: form.weekendAvailability,
       }
 
       // Save both in parallel
@@ -156,6 +160,23 @@ export default function DoctorProfile() {
           <Input label="Experience (years)" name="experience" type="number" value={form.experience} onChange={handleChange} leftIcon={<Clock className="w-4 h-4" />} />
           <Input label="Qualification" name="qualification" value={form.qualification} onChange={handleChange} leftIcon={<Award className="w-4 h-4" />} placeholder="e.g. MBBS, MD" />
           <Input label="Consultation Fee (₹)" name="consultationFee" type="number" value={form.consultationFee} onChange={handleChange} />
+        </div>
+
+        {/* Weekend Availability Toggle */}
+        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+          <div>
+            <label className="text-sm font-semibold text-slate-800 block">Weekend Availability</label>
+            <span className="text-xs text-slate-500">Allow patients to book appointments on Saturdays and Sundays.</span>
+          </div>
+          <button
+            type="button"
+            onClick={handleToggleWeekend}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${form.weekendAvailability ? 'bg-primary-600' : 'bg-slate-200'}`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${form.weekendAvailability ? 'translate-x-5' : 'translate-x-0'}`}
+            />
+          </button>
         </div>
         <div>
           <label className="label-base">Bio</label>
