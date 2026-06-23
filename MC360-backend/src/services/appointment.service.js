@@ -24,6 +24,30 @@ const bookAppointment = async ({
   if (!patient) throw Object.assign(new Error("Patient profile not found."), { statusCode: 404 });
   if (!doctor) throw Object.assign(new Error("Doctor not found."), { statusCode: 404 });
 
+  // Enforce rolling 7-day booking window and weekend availability
+  const dateStr = typeof date === 'string' ? date : new Date(date).toISOString().split('T')[0];
+  const [yr, mo, dy] = dateStr.split('-').map(Number);
+  const bookDate = new Date(Date.UTC(yr, mo - 1, dy));
+
+  const now = new Date();
+  const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const maxDateUTC = new Date(todayUTC.getTime() + 7 * 24 * 60 * 60 * 1000 - 1);
+
+  if (bookDate < todayUTC || bookDate > maxDateUTC) {
+    throw Object.assign(
+      new Error("Appointments can only be booked within a rolling 7-day window starting from today."),
+      { statusCode: 400 }
+    );
+  }
+
+  const dayName = bookDate.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
+  if (!doctor.weekendAvailability && (dayName === "Saturday" || dayName === "Sunday")) {
+    throw Object.assign(
+      new Error("This doctor is not available on weekends."),
+      { statusCode: 400 }
+    );
+  }
+
   // Check for double-booking
   const existing = await Appointment.findOne({
     doctor: doctorId,
@@ -135,6 +159,10 @@ const getDoctorAvailability = async (doctorId, date) => {
   const [year, month, day] = date.split('-').map(Number);
   const dateObj = new Date(Date.UTC(year, month - 1, day));
   const dayName = dateObj.toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
+  
+  if (!doctor.weekendAvailability && (dayName === "Saturday" || dayName === "Sunday")) {
+    return { available: false, message: "Weekend bookings are not enabled for this doctor.", slots: [] };
+  }
   
   console.log(`[SLOTS DEBUG] Date: ${date}, Parsed: Y=${year} M=${month} D=${day}, DayName: ${dayName}, DoctorID: ${doctorId}`);
   console.log(`[SLOTS DEBUG] Doctor availability array:`, doctor.availability?.map(a => ({ day: a.day, isAvailable: a.isAvailable, slotsCount: a.slots?.length })));

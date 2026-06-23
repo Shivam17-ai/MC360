@@ -40,6 +40,8 @@ const doctorSchema = new mongoose.Schema(
     // Leave / unavailable dates
     leaveDates: [{ type: Date }],
 
+    weekendAvailability: { type: Boolean, default: false },
+
     isVerified: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
   },

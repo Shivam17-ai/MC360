@@ -20,7 +20,7 @@ const updateMyProfile = async (req, res, next) => {
     const allowed = [
       "specialization", "subSpecialization", "qualifications", "experience",
       "biography", "languages", "consultationFee", "telemedicineAvailable",
-      "telemedicineFee", "availability", "leaveDates",
+      "telemedicineFee", "availability", "leaveDates", "weekendAvailability",
     ];
     const updates = {};
     allowed.forEach((f) => { if (req.body[f] !== undefined) updates[f] = req.body[f]; });
