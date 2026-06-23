@@ -1,14 +1,21 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Calendar, Users, Clock, Video, ArrowRight, CheckCircle2 } from 'lucide-react'
+import { Calendar, Users, Clock, ArrowRight } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
 import { appointmentService } from '../../services/appointmentService'
+import api from '../../services/api'
 import Avatar from '../../components/common/Avatar'
 import Badge from '../../components/common/Badge'
 import { smartDate } from '../../utils/formatDate'
 
 export default function DoctorDashboard() {
   const { user } = useAuthStore()
+
+  // Fetch real doctor stats (total patients, completed, etc.)
+  const { data: stats } = useQuery({
+    queryKey: ['doctor-stats'],
+    queryFn: () => api.get('/doctors/me/stats').then(r => r.data),
+  })
 
   const { data: todayAppts, isLoading: isTodayLoading } = useQuery({
     queryKey: ['doctor-appointments', 'today', new Date().toDateString()],
@@ -42,12 +49,13 @@ export default function DoctorDashboard() {
 
   const appointments = todayAppts || []
   const upcoming = upcomingAppts || []
+  const totalPatients = stats?.totalPatients ?? '—'
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Good morning, {user?.name?.split(' ')[0]} 👋</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Good morning, {user?.name}</h1>
           <p className="text-sm text-slate-500 mt-1">Here's your schedule for today.</p>
         </div>
       </div>
@@ -56,7 +64,7 @@ export default function DoctorDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
           { label: "Today's Appointments", value: appointments.length, icon: Calendar, bg: 'bg-primary-50', color: 'text-primary-600' },
-          { label: 'Total Patients', value: '248', icon: Users, bg: 'bg-teal-50', color: 'text-teal-600' },
+          { label: 'Total Patients', value: totalPatients, icon: Users, bg: 'bg-teal-50', color: 'text-teal-600' },
           { label: 'Upcoming', value: upcoming.length, icon: Clock, bg: 'bg-amber-50', color: 'text-amber-600' },
         ].map(s => (
           <div key={s.label} className="stat-card">

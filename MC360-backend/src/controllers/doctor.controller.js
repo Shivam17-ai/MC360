@@ -119,14 +119,15 @@ const getDoctorStats = async (req, res, next) => {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const [total, todayCount, pending, completed] = await Promise.all([
+    const [total, todayCount, pending, completed, uniquePatientIds] = await Promise.all([
       Appointment.countDocuments({ doctor: doctor._id }),
       Appointment.countDocuments({ doctor: doctor._id, date: { $gte: today } }),
       Appointment.countDocuments({ doctor: doctor._id, status: "pending" }),
       Appointment.countDocuments({ doctor: doctor._id, status: "completed" }),
+      Appointment.distinct("patient", { doctor: doctor._id }),
     ]);
 
-    return successResponse(res, { total, today: todayCount, pending, completed, rating: doctor.averageRating });
+    return successResponse(res, { total, today: todayCount, pending, completed, rating: doctor.averageRating, totalPatients: uniquePatientIds.length });
   } catch (err) { next(err); }
 };
 
