@@ -28,7 +28,13 @@ const getMyTests = async (req, res, next) => {
     if (!patient) return errorResponse(res, "Patient not found.", 404);
 
     const filter = { patient: patient._id };
-    if (req.query.status) filter.status = req.query.status;
+    if (req.query.status) {
+      if (req.query.status === "upcoming") {
+        filter.status = { $in: ["ordered", "sample-collected", "processing"] };
+      } else {
+        filter.status = req.query.status;
+      }
+    }
     if (req.query.category) filter.category = req.query.category;
 
     const { data, pagination } = await paginate(Test, filter, {
@@ -70,6 +76,13 @@ const collectSample = async (req, res, next) => {
 const bookTest = async (req, res, next) => {
   try {
     const { tests, date, homeCollection, address } = req.body;
+    if (!Array.isArray(tests) || tests.length === 0) {
+      return errorResponse(res, "Please select at least one test.", 400);
+    }
+    if (!date) {
+      return errorResponse(res, "Preferred date is required.", 400);
+    }
+
     const patient = await Patient.findOne({ user: req.user._id });
     if (!patient) return errorResponse(res, "Patient profile not found.", 404);
 

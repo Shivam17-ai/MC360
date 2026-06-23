@@ -83,7 +83,7 @@ export default function BookTest() {
             <h3 className="font-semibold text-slate-900">Booking Details</h3>
             <div>
               <label className="label-base">Preferred Date</label>
-              <input type="date" min={new Date().toLocaleDateString('en-CA')} value={date} onChange={e => setDate(e.target.value)} className="input-base" />
+              <input type="date" min={new Date().toISOString().split('T')[0]} value={date} onChange={e => setDate(e.target.value)} className="input-base" />
             </div>
             <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${homeCollection ? 'border-primary-500 bg-primary-50' : 'border-surface-200'}`}>
               <input type="checkbox" checked={homeCollection} onChange={e => setHomeCollection(e.target.checked)} className="w-4 h-4 accent-primary-600" />

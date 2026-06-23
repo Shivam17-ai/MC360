@@ -15,7 +15,7 @@ const initFirebase = () => {
       return null;
     }
 
-    if (admin.apps.length === 0) {
+    if (!admin.apps || admin.apps.length === 0) {
       firebaseApp = admin.initializeApp({
         credential: admin.credential.cert({
           projectId: env.FIREBASE_PROJECT_ID,

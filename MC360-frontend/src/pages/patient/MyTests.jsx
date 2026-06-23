@@ -11,7 +11,7 @@ import toast from 'react-hot-toast'
 const TABS = ['upcoming', 'completed', 'cancelled']
 
 const TAB_STATUS_MAP = {
-  upcoming: 'ordered',
+  upcoming: 'upcoming',
   completed: 'completed',
   cancelled: 'cancelled',
 }
@@ -30,13 +30,13 @@ export default function MyTests() {
     mutationFn: (id) => testService.cancel(id),
     onSuccess: () => {
       toast.success('Test booking cancelled')
-      qc.invalidateQueries(['tests'])
+      qc.invalidateQueries({ queryKey: ['tests'] })
       setCancelId(null)
     },
     onError: (e) => toast.error(e.message),
   })
 
-  const tests = data || []
+  const tests = Array.isArray(data) ? data : (data?.data || [])
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -86,7 +86,7 @@ export default function MyTests() {
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <h3 className="font-semibold text-slate-900">{test.testName}</h3>
-                      <p className="text-xs text-slate-500 uppercase tracking-wider">{test.category} · {test.testCode || 'REF-N/A'}</p>
+                      <p className="text-xs text-slate-500 uppercase tracking-wider">{test.category} · {test.testId || test.testCode || 'REF-N/A'}</p>
                     </div>
                     <Badge variant={test.status === 'ordered' ? 'yellow' : test.status === 'completed' ? 'green' : test.status === 'cancelled' ? 'red' : 'blue'}>
                       {test.status}

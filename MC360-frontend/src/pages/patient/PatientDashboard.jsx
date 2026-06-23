@@ -26,7 +26,7 @@ export default function PatientDashboard() {
 
   const { data: testsResponse, isLoading: testsLoading } = useQuery({
     queryKey: ['tests', 'upcoming'],
-    queryFn: () => testService.getAll({ status: 'ordered', limit: 3 }).then(r => r),
+    queryFn: () => testService.getAll({ status: 'upcoming', limit: 3 }).then(r => r),
     staleTime: 0,
   })
 
@@ -34,6 +34,7 @@ export default function PatientDashboard() {
   const totalAppointments = apptResponse?.pagination?.total ?? upcoming.length
   const meds = medicines || []
   const todayMeds = meds.filter(m => m.isActive)
+  const upcomingTests = Array.isArray(testsResponse) ? testsResponse : (testsResponse?.data || [])
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -54,7 +55,7 @@ export default function PatientDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Upcoming Appts', value: totalAppointments, icon: Calendar, bg: 'bg-primary-50', color: 'text-primary-600', to: '/patient/appointments' },
-          { label: 'Upcoming Tests', value: testsResponse?.pagination?.total ?? (testsResponse?.data || []).length, icon: FlaskConical, bg: 'bg-teal-50', color: 'text-teal-600', to: '/patient/tests' },
+          { label: 'Upcoming Tests', value: testsResponse?.pagination?.total ?? upcomingTests.length, icon: FlaskConical, bg: 'bg-teal-50', color: 'text-teal-600', to: '/patient/tests' },
           { label: 'Active Medicines', value: todayMeds.length, icon: Pill, bg: 'bg-amber-50', color: 'text-amber-600', to: '/patient/medicines' },
           { label: 'Health Score', value: '86', icon: Activity, bg: 'bg-emerald-50', color: 'text-emerald-600', to: '/patient/analytics' },
         ].map((stat) => (
@@ -149,7 +150,7 @@ export default function PatientDashboard() {
           </div>
           {testsLoading ? (
             <div className="space-y-3"><CardSkeleton /><CardSkeleton /></div>
-          ) : (testsResponse?.data || []).length === 0 ? (
+          ) : upcomingTests.length === 0 ? (
             <div className="text-center py-8">
               <FlaskConical className="w-8 h-8 text-slate-300 mx-auto mb-2" />
               <p className="text-sm text-slate-400">No upcoming tests</p>
@@ -157,7 +158,7 @@ export default function PatientDashboard() {
             </div>
           ) : (
             <div className="space-y-3">
-              {(testsResponse?.data || []).map((test) => (
+              {upcomingTests.map((test) => (
                 <div key={test._id} className="flex items-center gap-3 p-3 rounded-xl bg-surface-50">
                   <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center shrink-0">
                     <FlaskConical className="w-4 h-4 text-teal-600" />
