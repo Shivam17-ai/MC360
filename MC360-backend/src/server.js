@@ -23,7 +23,12 @@ const server = http.createServer(app);
 // ── Socket.IO ─────────────────────────────────────────────────────────────────
 const io = new Server(server, {
   cors: {
-    origin: [env.CLIENT_URL, "http://localhost:5173", "http://localhost:3000"],
+    origin: [
+      env.CLIENT_URL,
+      "http://localhost:5173",
+      "http://localhost:3000",
+      "https://mc360.onrender.com",
+    ],
     credentials: true,
     methods: ["GET", "POST"],
   },

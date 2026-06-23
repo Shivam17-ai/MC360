@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { appointmentService } from '../../services/appointmentService'
 import { SPECIALIZATIONS } from '../../utils/constants'
 import { Search, Calendar, Clock, MapPin, User } from 'lucide-react'
@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom'
 
 export default function BookAppointment() {
   const navigate = useNavigate()
+  const qc = useQueryClient()
 
   const [search, setSearch] = useState('')
   const [specialization, setSpecialization] = useState('')
@@ -26,7 +27,13 @@ export default function BookAppointment() {
     queryFn: () =>
       appointmentService
         .getDoctors({ search, specialization })
-        .then(r => r.data),
+        .then(r => {
+          // Backend paginatedResponse: r.data = { success, data:[...], pagination }
+          const payload = r?.data
+          if (Array.isArray(payload?.data)) return payload.data
+          if (Array.isArray(payload)) return payload
+          return []
+        }),
     keepPreviousData: true,
   })
 
@@ -35,7 +42,11 @@ export default function BookAppointment() {
     queryFn: () =>
       appointmentService
         .getSlots(selectedDoctor._id, selectedDate)
-        .then(r => r.data.availability?.slots || []),
+        .then(r => {
+          // successResponse wraps as: r.data = { success, data: { availability: { slots } } }
+          const inner = r?.data?.data ?? r?.data ?? {}
+          return inner.availability?.slots ?? inner.slots ?? []
+        }),
     enabled: !!selectedDoctor && !!selectedDate,
   })
 
@@ -43,6 +54,8 @@ export default function BookAppointment() {
     mutationFn: appointmentService.create,
 
     onSuccess: () => {
+      // Invalidate ALL appointment queries so MyAppointments refreshes
+      qc.invalidateQueries({ queryKey: ['appointments'] })
       toast.success('Appointment booked successfully!')
       navigate('/patient/appointments')
     },

@@ -17,6 +17,7 @@ export default function PatientDashboard() {
     queryKey: ['appointments', 'upcoming'],
     queryFn: () => appointmentService.getAll({ status: 'confirmed' }).then(r => r),
     staleTime: 0,
+    refetchOnMount: 'always',
   })
 
   const { data: medicines, isLoading: medLoading } = useQuery({
@@ -28,6 +29,7 @@ export default function PatientDashboard() {
     queryKey: ['tests', 'upcoming'],
     queryFn: () => testService.getAll({ status: 'upcoming', limit: 3 }).then(r => r),
     staleTime: 0,
+    refetchOnMount: 'always',
   })
 
   const upcoming = apptResponse?.data || []
@@ -96,8 +98,8 @@ export default function PatientDashboard() {
                     <Clock className="w-4 h-4 text-primary-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-900 truncate">{appt.doctor?.name || 'Doctor'}</p>
-                    <p className="text-xs text-slate-400">{smartDate(appt.date)} · {appt.slot}</p>
+                    <p className="text-sm font-medium text-slate-900 truncate">{appt.doctor?.user?.name || appt.doctor?.name || 'Doctor'}</p>
+                    <p className="text-xs text-slate-400">{smartDate(appt.date)} · {appt.timeSlot}</p>
                   </div>
                   <Badge variant={appt.status === 'confirmed' ? 'green' : 'yellow'}>{appt.status}</Badge>
                 </div>

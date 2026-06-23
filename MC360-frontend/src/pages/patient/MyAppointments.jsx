@@ -30,10 +30,14 @@ export default function MyAppointments() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['appointments', activeTab],
     staleTime: 0,
+    refetchOnMount: 'always',
     queryFn: async () => {
-      const body = await appointmentService.getAll({ status: TAB_STATUS_MAP[activeTab] })
-      if (Array.isArray(body?.data)) return body.data
-      if (Array.isArray(body)) return body
+      const res = await appointmentService.getAll({ status: TAB_STATUS_MAP[activeTab] })
+      // Backend uses paginatedResponse: axios wraps as res.data = { success, data:[...], pagination }
+      const payload = res?.data
+      if (Array.isArray(payload?.data)) return payload.data   // paginatedResponse shape
+      if (Array.isArray(payload)) return payload               // plain array shape
+      if (Array.isArray(res)) return res                       // raw array fallback
       return []
     },
   })

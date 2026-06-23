@@ -13,14 +13,13 @@ export const APPOINTMENT_STATUS = {
 }
 
 export const REPORT_TYPES = [
-  'Blood Test',
-  'X-Ray',
-  'MRI',
-  'CT Scan',
-  'ECG',
-  'Ultrasound',
-  'Urine Test',
-  'Other',
+  { value: 'lab-report',        label: 'Lab Report' },
+  { value: 'prescription',      label: 'Prescription' },
+  { value: 'discharge-summary', label: 'Discharge Summary' },
+  { value: 'imaging',           label: 'Imaging (X-Ray / MRI / CT)' },
+  { value: 'vaccination',       label: 'Vaccination' },
+  { value: 'insurance',         label: 'Insurance' },
+  { value: 'other',             label: 'Other' },
 ]
 
 export const SPECIALIZATIONS = [

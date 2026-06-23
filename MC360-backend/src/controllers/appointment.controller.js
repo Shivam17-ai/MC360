@@ -29,9 +29,11 @@ const getMyAppointments = async (req, res, next) => {
     if (req.query.type) filter.type = req.query.type;
     if (req.query.from) filter.date = { $gte: new Date(req.query.from) };
     if (req.query.to) filter.date = { ...filter.date, $lte: new Date(req.query.to) };
-    // For upcoming (confirmed) appointments, only return future ones
+    // For upcoming (confirmed) appointments, return appointments from today onwards
     if (req.query.status === "confirmed" && !req.query.from) {
-      filter.date = { ...filter.date, $gte: new Date() };
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      filter.date = { ...filter.date, $gte: today };
     }
 
     const { data, pagination } = await paginate(Appointment, filter, {

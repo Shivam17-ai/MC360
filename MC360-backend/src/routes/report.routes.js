@@ -8,8 +8,10 @@ const { uploadLimiter } = require("../middlewares/rateLimiter.middleware");
 
 router.use(protect);
 
+// POST / and POST /upload both handle report uploads
 router.post("/", uploadLimiter, upload.single("file"), reportController.uploadReport);
-router.get("/", authorize("patient"), reportController.getMyReports);
+router.post("/upload", uploadLimiter, upload.single("file"), reportController.uploadReport);
+router.get("/", reportController.getMyReports);
 router.get("/patient/:patientId", authorize("doctor", "hospital", "admin"), reportController.getPatientReports);
 router.get("/:id", reportController.getReportById);
 router.delete("/:id", reportController.deleteReport);

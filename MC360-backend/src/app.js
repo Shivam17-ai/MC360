@@ -25,7 +25,12 @@ app.use(hpp());
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
 app.use(cors({
-  origin: [env.CLIENT_URL, "http://localhost:5173", "http://localhost:3000"],
+  origin: [
+    env.CLIENT_URL,
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://mc360.onrender.com",
+  ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],

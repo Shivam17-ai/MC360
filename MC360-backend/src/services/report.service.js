@@ -5,6 +5,15 @@ const { summarizeReport } = require("./ai.service");
 const logger = require("../utils/logger");
 
 const uploadReport = async (patientId, uploadedBy, file, metadata) => {
+  // Guard: fail fast if Cloudinary isn't configured
+  const env = require("../config/env");
+  if (!env.CLOUDINARY_CLOUD_NAME || !env.CLOUDINARY_API_KEY || !env.CLOUDINARY_API_SECRET) {
+    throw Object.assign(
+      new Error("File storage is not configured. Please add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET to your environment variables."),
+      { statusCode: 503 }
+    );
+  }
+
   // Upload to Cloudinary
   const folder = `mc360/reports/${patientId}`;
   const resourceType = file.mimetype === "application/pdf" ? "raw" : "image";
