@@ -3,7 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { appointmentService } from '../../services/appointmentService'
 import api from '../../services/api'
 import {
-  Calendar, Video, User, CheckCircle, RefreshCcw, XCircle, Upload, FileText, Loader2
+  Calendar, Video, User, CheckCircle, RefreshCcw, XCircle,
+  Upload, FileText, Loader2, Search, X as XIcon,
 } from 'lucide-react'
 import Avatar from '../../components/common/Avatar'
 import Badge from '../../components/common/Badge'
@@ -11,51 +12,149 @@ import Modal from '../../components/common/Modal'
 import { formatDate } from '../../utils/formatDate'
 import toast from 'react-hot-toast'
 
-const TABS = ['today', 'upcoming', 'completed', 'cancelled']
+/* ──────────────────────────────────────────────────────────────
+   Sorting helpers
+   Queue  → earliest date+timeSlot first (FIFO for Today/Upcoming)
+   Stack  → most recently updatedAt first (LIFO for Completed/Revisit/Cancelled)
+────────────────────────────────────────────────────────────── */
+const sortQueue = (arr) =>
+  [...arr].sort((a, b) => {
+    const d = new Date(a.date) - new Date(b.date)
+    return d !== 0 ? d : (a.timeSlot || '').localeCompare(b.timeSlot || '')
+  })
 
-const getTabParams = (tab) => {
-  const todayStart = new Date()
-  todayStart.setHours(0, 0, 0, 0)
-  const todayEnd = new Date()
-  todayEnd.setHours(23, 59, 59, 999)
-  const tomorrow = new Date(todayEnd.getTime() + 1)
+const sortStack = (arr) =>
+  [...arr].sort(
+    (a, b) =>
+      new Date(b.updatedAt || b.createdAt) -
+      new Date(a.updatedAt || a.createdAt)
+  )
 
-  if (tab === 'today')     return { status: 'confirmed', from: todayStart.toISOString(), to: todayEnd.toISOString() }
-  if (tab === 'upcoming')  return { status: 'confirmed', from: tomorrow.toISOString() }
-  if (tab === 'completed') return { status: 'completed' }
-  return { status: 'cancelled' }
+/* ─── search filter (patient ID) ─── */
+const matchesPatientId = (appt, q) => {
+  if (!q.trim()) return true
+  return (appt.patient?.patientId || '').toLowerCase().includes(q.toLowerCase().trim())
 }
 
-const CLOSE_REVISIT  = { open: false, appt: null, days: '7' }
-const CLOSE_REPORT   = { open: false, appt: null, title: '', type: 'other', file: null, uploading: false }
+/* ─── modal default states ─── */
+const CLOSE_REVISIT = { open: false, appt: null, days: '7' }
+const CLOSE_REPORT  = { open: false, appt: null, title: '', type: 'other', file: null, uploading: false }
+
+const TABS = ['today', 'upcoming', 'completed', 'revisit', 'cancelled']
+
+const QUERY_KEYS = {
+  today:     'doctor-appts-today',
+  upcoming:  'doctor-appts-upcoming',
+  completed: 'doctor-appts-completed',   // shared between completed + revisit
+  cancelled: 'doctor-appts-cancelled',
+}
 
 export default function DoctorAppointments() {
   const [tab, setTab] = useState('today')
-  const queryClient  = useQueryClient()
+  const queryClient   = useQueryClient()
+
+  const [searchToday,  setSearchToday]  = useState('')
+  const [searchRevisit, setSearchRevisit] = useState('')
 
   const [revisitModal, setRevisitModal] = useState(CLOSE_REVISIT)
   const [reportModal,  setReportModal]  = useState(CLOSE_REPORT)
 
-  /* ─── data ─── */
-  const { data, isLoading } = useQuery({
-    queryKey: ['doctor-appointments', tab, new Date().toDateString()],
-    queryFn:  () => appointmentService.getAll(getTabParams(tab)).then(r => r.data),
+  /* ── date helpers ── */
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+  const todayEnd   = new Date(); todayEnd.setHours(23, 59, 59, 999)
+  const tomorrow   = new Date(todayEnd.getTime() + 1)
+
+  /* ──────────── queries ──────────── */
+  const todayQ = useQuery({
+    queryKey: [QUERY_KEYS.today, todayStart.toDateString()],
+    queryFn:  () =>
+      appointmentService.getAll({
+        status: 'confirmed',
+        from: todayStart.toISOString(),
+        to:   todayEnd.toISOString(),
+        limit: 200,
+      }).then(r => r.data),
+    enabled: tab === 'today',
   })
 
-  /* ─── mutations ─── */
+  const upcomingQ = useQuery({
+    queryKey: [QUERY_KEYS.upcoming],
+    queryFn:  () =>
+      appointmentService.getAll({
+        status: 'confirmed',
+        from: tomorrow.toISOString(),
+        limit: 200,
+      }).then(r => r.data),
+    enabled: tab === 'upcoming',
+  })
+
+  // Shared for both "completed" and "revisit" tabs
+  const completedQ = useQuery({
+    queryKey: [QUERY_KEYS.completed],
+    queryFn:  () =>
+      appointmentService.getAll({ status: 'completed', limit: 200 }).then(r => r.data),
+    enabled: tab === 'completed' || tab === 'revisit',
+  })
+
+  const cancelledQ = useQuery({
+    queryKey: [QUERY_KEYS.cancelled],
+    queryFn:  () =>
+      appointmentService.getAll({ status: 'cancelled', limit: 200 }).then(r => r.data),
+    enabled: tab === 'cancelled',
+  })
+
+  /* ──────────── derived data ──────────── */
+  // Queue: today confirmed sorted by earliest time
+  const todayAll   = sortQueue(todayQ.data || [])
+  const todayAppts = todayAll.filter(a => matchesPatientId(a, searchToday))
+
+  // Queue: upcoming confirmed sorted by earliest date then time
+  const upcomingAppts = sortQueue(upcomingQ.data || [])
+
+  // Stack: completed sorted by most-recently-updated; split Completed vs Revisit
+  const completedAll   = completedQ.data || []
+  const completedAppts = sortStack(completedAll.filter(a => !a.followUpRequired))
+  const revisitAll     = sortStack(completedAll.filter(a => a.followUpRequired))
+  const revisitAppts   = revisitAll.filter(a => matchesPatientId(a, searchRevisit))
+
+  // Stack: cancelled sorted by most-recently-cancelled
+  const cancelledAppts = sortStack(cancelledQ.data || [])
+
+  /* ──────────── active data for current tab ──────────── */
+  const activeData = {
+    today:     todayAppts,
+    upcoming:  upcomingAppts,
+    completed: completedAppts,
+    revisit:   revisitAppts,
+    cancelled: cancelledAppts,
+  }[tab]
+
+  const isLoading = {
+    today:     todayQ.isLoading,
+    upcoming:  upcomingQ.isLoading,
+    completed: completedQ.isLoading,
+    revisit:   completedQ.isLoading,
+    cancelled: cancelledQ.isLoading,
+  }[tab]
+
+  /* ──────────── mutations ──────────── */
+  const invalidateAll = () => {
+    Object.values(QUERY_KEYS).forEach(k => queryClient.invalidateQueries([k]))
+  }
+
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => appointmentService.updateStatus(id, data),
-    onSuccess: () => { queryClient.invalidateQueries(['doctor-appointments']); toast.success('Appointment updated') },
+    onSuccess: () => { invalidateAll(); toast.success('Appointment updated') },
     onError:   () => toast.error('Failed to update'),
   })
 
   const cancelMutation = useMutation({
     mutationFn: ({ id, reason }) => appointmentService.cancel(id, { reason }),
-    onSuccess: () => { queryClient.invalidateQueries(['doctor-appointments']); toast.success('Appointment cancelled') },
+    onSuccess: () => { invalidateAll(); toast.success('Appointment cancelled') },
     onError:   () => toast.error('Failed to cancel'),
   })
 
-  /* ─── handlers ─── */
+  /* ──────────── handlers ──────────── */
   const handleComplete = (id) =>
     updateMutation.mutate({ id, data: { status: 'completed', followUpRequired: false } })
 
@@ -79,7 +178,6 @@ export default function DoctorAppointments() {
   const submitReport = async () => {
     if (!reportModal.file)         return toast.error('Please select a file')
     if (!reportModal.title.trim()) return toast.error('Please enter a report title')
-
     setReportModal(p => ({ ...p, uploading: true }))
     try {
       const fd = new FormData()
@@ -88,7 +186,6 @@ export default function DoctorAppointments() {
       fd.append('appointmentId', reportModal.appt._id)
       fd.append('title',         reportModal.title.trim())
       fd.append('type',          reportModal.type)
-
       await api.post('/reports/for-patient', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
       toast.success('Report uploaded successfully')
       setReportModal(CLOSE_REPORT)
@@ -98,16 +195,15 @@ export default function DoctorAppointments() {
     }
   }
 
-  const appts = data || []
-
-  /* ─── follow-up preview date ─── */
   const previewFollowUp = () => {
     const d = parseInt(revisitModal.days, 10)
     if (!d || d < 1) return null
-    return new Date(Date.now() + d * 86_400_000).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+    return new Date(Date.now() + d * 86_400_000).toLocaleDateString('en-IN', {
+      day: 'numeric', month: 'short', year: 'numeric',
+    })
   }
 
-  /* ─── ui ─── */
+  /* ──────────── render ──────────── */
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
@@ -115,8 +211,8 @@ export default function DoctorAppointments() {
         <p className="section-subtitle">Manage your consultation schedule</p>
       </div>
 
-      {/* Tab bar */}
-      <div className="flex gap-1 bg-surface-100 rounded-xl p-1 w-fit">
+      {/* ── Tab bar ── */}
+      <div className="flex gap-1 bg-surface-100 rounded-xl p-1 w-fit flex-wrap">
         {TABS.map(t => (
           <button
             key={t}
@@ -129,14 +225,53 @@ export default function DoctorAppointments() {
         ))}
       </div>
 
-      {/* Table */}
+      {/* ── Search bars (Today + Revisit only) ── */}
+      {tab === 'today' && (
+        <div className="relative w-72">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search by patient ID…"
+            value={searchToday}
+            onChange={e => setSearchToday(e.target.value)}
+            className="input-base pl-9 pr-8 py-2 text-sm"
+          />
+          {searchToday && (
+            <button onClick={() => setSearchToday('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">
+              <XIcon className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      )}
+
+      {tab === 'revisit' && (
+        <div className="relative w-72">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search by patient ID…"
+            value={searchRevisit}
+            onChange={e => setSearchRevisit(e.target.value)}
+            className="input-base pl-9 pr-8 py-2 text-sm"
+          />
+          {searchRevisit && (
+            <button onClick={() => setSearchRevisit('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700">
+              <XIcon className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── Table ── */}
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-surface-200 bg-surface-50">
                 {['Patient', 'Date & Time', 'Type', 'Reason', 'Status', 'Action'].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                  <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    {h}
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -149,123 +284,129 @@ export default function DoctorAppointments() {
                     ))}
                   </tr>
                 ))
-              ) : appts.length === 0 ? (
+              ) : activeData.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-4 py-12 text-center text-slate-400">
-                    No {tab} appointments
+                    {(tab === 'today' && searchToday) || (tab === 'revisit' && searchRevisit)
+                      ? 'No appointments match that patient ID'
+                      : `No ${tab} appointments`}
                   </td>
                 </tr>
-              ) : appts.map(appt => (
-                <tr key={appt._id} className="hover:bg-surface-50 transition-colors">
+              ) : (
+                activeData.map(appt => (
+                  <tr key={appt._id} className="hover:bg-surface-50 transition-colors">
 
-                  {/* Patient */}
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <Avatar name={appt.patient?.user?.name} size="sm" />
-                      <div>
-                        <p className="font-medium text-slate-900">{appt.patient?.user?.name || '—'}</p>
-                        <p className="text-[10px] font-bold text-primary-600 tracking-tight">{appt.patient?.patientId?.replace('MC360-', '')}</p>
-                        <p className="text-xs text-slate-400">{appt.patient?.user?.phone}</p>
+                    {/* Patient */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <Avatar name={appt.patient?.user?.name} size="sm" />
+                        <div>
+                          <p className="font-medium text-slate-900">{appt.patient?.user?.name || '—'}</p>
+                          <p className="text-[10px] font-bold text-primary-600 tracking-tight">
+                            {appt.patient?.patientId}
+                          </p>
+                          <p className="text-xs text-slate-400">{appt.patient?.user?.phone}</p>
+                        </div>
                       </div>
-                    </div>
-                  </td>
+                    </td>
 
-                  {/* Date & Time */}
-                  <td className="px-4 py-3">
-                    <p className="text-slate-700">{formatDate(appt.date)}</p>
-                    <p className="text-xs text-slate-400">{appt.timeSlot}</p>
-                  </td>
+                    {/* Date & Time */}
+                    <td className="px-4 py-3">
+                      <p className="text-slate-700">{formatDate(appt.date)}</p>
+                      <p className="text-xs text-slate-400">{appt.timeSlot}</p>
+                    </td>
 
-                  {/* Type */}
-                  <td className="px-4 py-3">
-                    <Badge variant={appt.type === 'telemedicine' ? 'blue' : 'gray'}>
-                      {appt.type === 'telemedicine' ? <Video className="w-3 h-3" /> : <User className="w-3 h-3" />}
-                      {appt.type}
-                    </Badge>
-                  </td>
-
-                  {/* Reason */}
-                  <td className="px-4 py-3 text-slate-600 max-w-[160px] truncate">{appt.reason}</td>
-
-                  {/* Status */}
-                  <td className="px-4 py-3">
-                    <div className="flex flex-col gap-1">
-                      <Badge variant={
-                        appt.status === 'confirmed'  ? 'green' :
-                        appt.status === 'completed'  ? 'blue'  :
-                        appt.status === 'cancelled'  ? 'red'   : 'gray'
-                      }>
-                        {appt.status}
+                    {/* Type */}
+                    <td className="px-4 py-3">
+                      <Badge variant={appt.type === 'telemedicine' ? 'blue' : 'gray'}>
+                        {appt.type === 'telemedicine' ? <Video className="w-3 h-3" /> : <User className="w-3 h-3" />}
+                        {appt.type}
                       </Badge>
-                      {appt.followUpRequired && (
-                        <Badge variant="yellow" className="text-[10px] py-0">
-                          Revisit {appt.followUpDate
-                            ? `· ${new Date(appt.followUpDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`
-                            : ''}
+                    </td>
+
+                    {/* Reason */}
+                    <td className="px-4 py-3 text-slate-600 max-w-[150px] truncate">{appt.reason}</td>
+
+                    {/* Status */}
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-1">
+                        <Badge variant={
+                          appt.status === 'confirmed' ? 'green' :
+                          appt.status === 'completed' ? 'blue'  :
+                          appt.status === 'cancelled' ? 'red'   : 'gray'
+                        }>
+                          {appt.status}
                         </Badge>
-                      )}
-                    </div>
-                  </td>
+                        {appt.followUpRequired && (
+                          <Badge variant="yellow" className="text-[10px] py-0">
+                            Revisit{appt.followUpDate
+                              ? ` · ${new Date(appt.followUpDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}`
+                              : ''}
+                          </Badge>
+                        )}
+                      </div>
+                    </td>
 
-                  {/* Actions */}
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-2 items-center">
+                    {/* Actions */}
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-2 items-center">
 
-                      {/* ── confirmed: Complete / Revisit / Cancel ── */}
-                      {appt.status === 'confirmed' && (
-                        <>
+                        {/* confirmed → Complete / Revisit / Cancel */}
+                        {appt.status === 'confirmed' && (
+                          <>
+                            <button
+                              onClick={() => handleComplete(appt._id)}
+                              disabled={updateMutation.isPending}
+                              title="Mark Completed"
+                              className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg
+                                text-emerald-700 bg-emerald-50 border border-emerald-100
+                                hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                            >
+                              <CheckCircle className="w-3.5 h-3.5" /> Complete
+                            </button>
+
+                            <button
+                              onClick={() => setRevisitModal({ open: true, appt, days: '7' })}
+                              disabled={updateMutation.isPending}
+                              title="Schedule Revisit"
+                              className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg
+                                text-amber-700 bg-amber-50 border border-amber-100
+                                hover:bg-amber-100 transition-colors disabled:opacity-50"
+                            >
+                              <RefreshCcw className="w-3.5 h-3.5" /> Revisit
+                            </button>
+
+                            <button
+                              onClick={() => handleCancel(appt._id)}
+                              disabled={cancelMutation.isPending}
+                              title="Cancel Appointment"
+                              className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg
+                                text-red-700 bg-red-50 border border-red-100
+                                hover:bg-red-100 transition-colors disabled:opacity-50"
+                            >
+                              <XCircle className="w-3.5 h-3.5" /> Cancel
+                            </button>
+                          </>
+                        )}
+
+                        {/* completed/revisit → Upload Report */}
+                        {appt.status === 'completed' && (
                           <button
-                            onClick={() => handleComplete(appt._id)}
-                            disabled={updateMutation.isPending}
-                            title="Mark Completed"
+                            onClick={() => setReportModal({ open: true, appt, title: '', type: 'other', file: null, uploading: false })}
+                            title="Upload Patient Report"
                             className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg
-                              text-emerald-700 bg-emerald-50 border border-emerald-100
-                              hover:bg-emerald-100 transition-colors disabled:opacity-50"
+                              text-primary-700 bg-primary-50 border border-primary-100
+                              hover:bg-primary-100 transition-colors"
                           >
-                            <CheckCircle className="w-3.5 h-3.5" /> Complete
+                            <Upload className="w-3.5 h-3.5" /> Upload Report
                           </button>
+                        )}
 
-                          <button
-                            onClick={() => setRevisitModal({ open: true, appt, days: '7' })}
-                            disabled={updateMutation.isPending}
-                            title="Schedule Revisit"
-                            className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg
-                              text-amber-700 bg-amber-50 border border-amber-100
-                              hover:bg-amber-100 transition-colors disabled:opacity-50"
-                          >
-                            <RefreshCcw className="w-3.5 h-3.5" /> Revisit
-                          </button>
-
-                          <button
-                            onClick={() => handleCancel(appt._id)}
-                            disabled={cancelMutation.isPending}
-                            title="Cancel Appointment"
-                            className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg
-                              text-red-700 bg-red-50 border border-red-100
-                              hover:bg-red-100 transition-colors disabled:opacity-50"
-                          >
-                            <XCircle className="w-3.5 h-3.5" /> Cancel
-                          </button>
-                        </>
-                      )}
-
-                      {/* ── completed: Upload Report ── */}
-                      {appt.status === 'completed' && (
-                        <button
-                          onClick={() => setReportModal({ open: true, appt, title: '', type: 'other', file: null, uploading: false })}
-                          title="Upload Patient Report"
-                          className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg
-                            text-primary-700 bg-primary-50 border border-primary-100
-                            hover:bg-primary-100 transition-colors"
-                        >
-                          <Upload className="w-3.5 h-3.5" /> Upload Report
-                        </button>
-                      )}
-
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -283,7 +424,9 @@ export default function DoctorAppointments() {
             <Avatar name={revisitModal.appt?.patient?.user?.name} size="sm" />
             <div>
               <p className="text-sm font-semibold text-slate-900">{revisitModal.appt?.patient?.user?.name}</p>
-              <p className="text-xs text-slate-500">{revisitModal.appt?.timeSlot} · {formatDate(revisitModal.appt?.date)}</p>
+              <p className="text-xs text-slate-500">
+                {revisitModal.appt?.timeSlot} · {formatDate(revisitModal.appt?.date)}
+              </p>
             </div>
           </div>
 
@@ -302,7 +445,8 @@ export default function DoctorAppointments() {
             />
             {previewFollowUp() && (
               <p className="text-xs text-slate-400 mt-2 text-center">
-                📅 Revisit date: <span className="font-semibold text-slate-700">{previewFollowUp()}</span>
+                📅 Revisit date:{' '}
+                <span className="font-semibold text-slate-700">{previewFollowUp()}</span>
               </p>
             )}
           </div>
@@ -335,16 +479,16 @@ export default function DoctorAppointments() {
         size="md"
       >
         <div className="space-y-5">
-          {/* Patient info bar */}
           <div className="flex items-center gap-3 p-3 bg-primary-50 rounded-xl border border-primary-100">
             <Avatar name={reportModal.appt?.patient?.user?.name} size="sm" />
             <div>
               <p className="text-sm font-semibold text-slate-900">{reportModal.appt?.patient?.user?.name}</p>
-              <p className="text-xs text-slate-500">{reportModal.appt?.timeSlot} · {formatDate(reportModal.appt?.date)}</p>
+              <p className="text-xs text-slate-500">
+                {reportModal.appt?.timeSlot} · {formatDate(reportModal.appt?.date)}
+              </p>
             </div>
           </div>
 
-          {/* Report Title */}
           <div>
             <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1.5">
               Report Title *
@@ -358,7 +502,6 @@ export default function DoctorAppointments() {
             />
           </div>
 
-          {/* Report Type */}
           <div>
             <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1.5">
               Report Type
@@ -377,12 +520,13 @@ export default function DoctorAppointments() {
             </select>
           </div>
 
-          {/* File picker */}
           <div>
             <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1.5">
               File (PDF or Image) *
             </label>
-            <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-surface-200 rounded-xl cursor-pointer hover:border-primary-300 hover:bg-primary-50/50 transition-colors">
+            <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed
+              border-surface-200 rounded-xl cursor-pointer hover:border-primary-300
+              hover:bg-primary-50/50 transition-colors">
               <Upload className="w-6 h-6 text-slate-300 mb-1" />
               <span className="text-xs text-slate-400">Click to browse or drag & drop</span>
               <span className="text-[10px] text-slate-300 mt-0.5">PDF, JPG, PNG accepted</span>
@@ -408,7 +552,8 @@ export default function DoctorAppointments() {
             <button
               onClick={() => setReportModal(CLOSE_REPORT)}
               disabled={reportModal.uploading}
-              className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-surface-100 rounded-lg transition-colors disabled:opacity-50"
+              className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-surface-100
+                rounded-lg transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
