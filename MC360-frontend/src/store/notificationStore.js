@@ -37,4 +37,8 @@ export const useNotificationStore = create((set, get) => ({
       unreadCount: s.unreadCount + 1,
     }))
   },
+
+  reset: () => {
+    set({ notifications: [], unreadCount: 0 })
+  },
 }))

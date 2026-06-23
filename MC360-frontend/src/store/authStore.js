@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { authService } from '../services/authService'
 import { storage } from '../utils/storage'
+import { queryClient } from '../config/queryClient'
+import { useNotificationStore } from './notificationStore'
 
 export const useAuthStore = create((set, get) => ({
   user: storage.get('user'),
@@ -11,7 +13,10 @@ export const useAuthStore = create((set, get) => ({
 
   checkAuth: async () => {
     const token = storage.get('token')
-    const user = storage.get('user')
+    let user = storage.get('user')
+    if (user && user.user) {
+      user = user.user // Unwrap nested user if stored by previous bugged version
+    }
     
     if (token && user) {
       // Sync state with storage immediately if not already set
@@ -20,8 +25,8 @@ export const useAuthStore = create((set, get) => ({
       }
       try {
         const fresh = await authService.getMe()
-        set({ user: fresh.data, isAuthenticated: true, isInitialized: true })
-        storage.set('user', fresh.data)
+        set({ user: fresh.data?.user, isAuthenticated: true, isInitialized: true })
+        storage.set('user', fresh.data?.user)
       } catch (err) {
         console.error("Auth check failed:", err)
         if (err.status === 401) {
@@ -79,6 +84,8 @@ export const useAuthStore = create((set, get) => ({
 
   logout: () => {
     storage.clear()
+    queryClient.clear()
+    useNotificationStore.getState().reset()
     set({ user: null, token: null, isAuthenticated: false })
   },
 
