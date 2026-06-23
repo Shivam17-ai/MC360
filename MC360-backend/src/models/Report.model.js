@@ -7,6 +7,7 @@ const reportSchema = new mongoose.Schema(
     uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     doctor: { type: mongoose.Schema.Types.ObjectId, ref: "Doctor" },
     hospital: { type: mongoose.Schema.Types.ObjectId, ref: "Hospital" },
+    appointment: { type: mongoose.Schema.Types.ObjectId, ref: "Appointment" },
     title: { type: String, required: true },
     type: {
       type: String,

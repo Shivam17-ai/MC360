@@ -78,8 +78,10 @@ const rescheduleAppointment = async (req, res, next) => {
 
 const updateAppointmentStatus = async (req, res, next) => {
   try {
-    const { status, notes, followUpRequired } = req.body;
-    const appointment = await Appointment.findByIdAndUpdate(req.params.id, { status, notes, followUpRequired }, { new: true });
+    const { status, notes, followUpRequired, followUpDate } = req.body;
+    const update = { status, notes, followUpRequired };
+    if (followUpDate) update.followUpDate = new Date(followUpDate);
+    const appointment = await Appointment.findByIdAndUpdate(req.params.id, update, { new: true });
     if (!appointment) return errorResponse(res, "Appointment not found.", 404);
     return successResponse(res, { appointment }, "Status updated.");
   } catch (err) { next(err); }

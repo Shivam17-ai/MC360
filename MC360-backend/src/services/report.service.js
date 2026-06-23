@@ -33,6 +33,7 @@ const uploadReport = async (patientId, uploadedBy, file, metadata) => {
     tags: metadata.tags ? metadata.tags.split(",").map((t) => t.trim()) : [],
     doctor: metadata.doctorId,
     hospital: metadata.hospitalId,
+    appointment: metadata.appointmentId || null,
   });
 
   return report;

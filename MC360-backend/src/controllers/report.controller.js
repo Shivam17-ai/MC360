@@ -1,5 +1,6 @@
 const Report = require("../models/Report.model");
 const Patient = require("../models/Patient.model");
+const Doctor = require("../models/Doctor.model");
 const reportService = require("../services/report.service");
 const paginate = require("../utils/paginate");
 const { successResponse, errorResponse, paginatedResponse } = require("../utils/response");
@@ -74,4 +75,23 @@ const getPatientReports = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { uploadReport, getMyReports, getReportById, deleteReport, summarizeReport, shareReport, getPatientReports };
+// Doctor uploads a report for their patient (linked to an appointment)
+const uploadReportForPatient = async (req, res, next) => {
+  try {
+    if (!req.file) return errorResponse(res, "File is required.", 400);
+    const doctor = await Doctor.findOne({ user: req.user._id });
+    if (!doctor) return errorResponse(res, "Doctor profile not found.", 404);
+    const { patientId, appointmentId, ...rest } = req.body;
+    if (!patientId) return errorResponse(res, "patientId is required.", 400);
+    const patient = await Patient.findById(patientId);
+    if (!patient) return errorResponse(res, "Patient not found.", 404);
+    const report = await reportService.uploadReport(patient._id, req.user._id, req.file, {
+      ...rest,
+      doctorId: doctor._id,
+      appointmentId: appointmentId || null,
+    });
+    return successResponse(res, { report }, "Report uploaded for patient.", 201);
+  } catch (err) { next(err); }
+};
+
+module.exports = { uploadReport, getMyReports, getReportById, deleteReport, summarizeReport, shareReport, getPatientReports, uploadReportForPatient };
