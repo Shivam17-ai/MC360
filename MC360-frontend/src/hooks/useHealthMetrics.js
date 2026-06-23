@@ -16,5 +16,14 @@ export const useHealthMetrics = (type) => {
     onError: (e) => toast.error(e.message),
   })
 
-  return { metrics: data || [], isLoading, add }
+  const addBulk = useMutation({
+    mutationFn: healthMetricsService.addBulk,
+    onSuccess: (res) => {
+      qc.invalidateQueries(['health-metrics'])
+      toast.success(`${res.data?.count ?? 'All'} vitals logged successfully`)
+    },
+    onError: (e) => toast.error(e.message),
+  })
+
+  return { metrics: data || [], isLoading, add, addBulk }
 }

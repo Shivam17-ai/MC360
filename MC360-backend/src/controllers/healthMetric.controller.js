@@ -85,4 +85,45 @@ const deleteMetric = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { addMetric, getMyMetrics, getMetricsByType, getLatestMetrics, deleteMetric };
+// Bulk-add: accepts array of { type, value, unit, notes } objects
+// Only saves entries where a value is actually provided
+const addBulkMetrics = async (req, res, next) => {
+  try {
+    const patient = await Patient.findOne({ user: req.user._id });
+    if (!patient) return errorResponse(res, "Patient not found.", 404);
+
+    const entries = Array.isArray(req.body.metrics) ? req.body.metrics : [];
+    if (entries.length === 0) return errorResponse(res, "No metrics provided.", 400);
+
+    const notifService = require("../services/notification.service");
+    const recordedAt = req.body.recordedAt ? new Date(req.body.recordedAt) : new Date();
+
+    const docs = [];
+    const abnormalTypes = [];
+
+    for (const entry of entries) {
+      if (entry.value === undefined || entry.value === null || entry.value === "") continue;
+      const abnormal = isAbnormal(entry.type, entry.value);
+      if (abnormal) abnormalTypes.push(entry.type);
+      docs.push({ ...entry, patient: patient._id, recordedBy: req.user._id, recordedAt, isAbnormal: abnormal });
+    }
+
+    if (docs.length === 0) return errorResponse(res, "All metric values were empty.", 400);
+
+    const metrics = await HealthMetric.insertMany(docs);
+
+    if (abnormalTypes.length > 0) {
+      await notifService.createNotification({
+        userId: req.user._id,
+        title: "Abnormal Health Reading",
+        message: `Abnormal readings detected: ${abnormalTypes.map(t => t.replace(/_/g, " ")).join(", ")}. Please consult your doctor.`,
+        type: "health_alert",
+        priority: "high",
+      });
+    }
+
+    return successResponse(res, { metrics, count: metrics.length }, "Vitals logged successfully.", 201);
+  } catch (err) { next(err); }
+};
+
+module.exports = { addMetric, addBulkMetrics, getMyMetrics, getMetricsByType, getLatestMetrics, deleteMetric };

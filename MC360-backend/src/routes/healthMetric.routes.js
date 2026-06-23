@@ -7,6 +7,7 @@ const { authorize } = require("../middlewares/role.middleware");
 router.use(protect);
 
 router.post("/", healthMetricController.addMetric);
+router.post("/bulk", healthMetricController.addBulkMetrics);
 router.get("/", healthMetricController.getMyMetrics);
 router.get("/latest", healthMetricController.getLatestMetrics);
 router.get("/type/:type", healthMetricController.getMetricsByType);
