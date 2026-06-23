@@ -60,11 +60,9 @@ const registerUser = async ({ name, email, password, phone, role }) => {
     await Hospital.create({ user: user._id, name });
   }
 
-  try {
-    await sendWelcomeEmail(user);
-  } catch (err) {
+  sendWelcomeEmail(user).catch((err) => {
     logger.warn(`Welcome email failed: ${err.message}`);
-  }
+  });
 
   const accessToken = generateAccessToken(user._id, user.role);
   const refreshToken = generateRefreshToken(user._id);

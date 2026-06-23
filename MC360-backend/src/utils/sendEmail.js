@@ -20,6 +20,9 @@ const getTransporter = () => {
       user: env.SMTP_USER,
       pass: env.SMTP_PASS,
     },
+    family: 4, // Force IPv4 to prevent IPv6 ENETUNREACH failures in hosting environments (like Render)
+    connectionTimeout: 5000, // 5 seconds connection timeout
+    greetingTimeout: 5000,
   });
 
   return transporter;
