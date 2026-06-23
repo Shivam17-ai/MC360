@@ -82,7 +82,7 @@ export default function MedicineTracker() {
                 <p className="text-sm text-slate-500 mt-0.5">{med.dosage}</p>
               </div>
               <div className="flex flex-wrap gap-1.5">
-                <Badge variant="yellow">{med.frequency?.replace(/_/g, ' ')}</Badge>
+                <Badge variant="yellow">{med.frequency?.replace(/-/g, ' ')}</Badge>
                 {med.isActive ? <Badge variant="green" dot>Active</Badge> : <Badge variant="gray">Inactive</Badge>}
               </div>
               <div className="text-xs text-slate-400 pt-1 border-t border-surface-100">

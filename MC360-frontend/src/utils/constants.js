@@ -44,12 +44,13 @@ export const SPECIALIZATIONS = [
 export const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
 
 export const FREQUENCY_OPTIONS = [
-  { value: 'once_daily', label: 'Once daily' },
-  { value: 'twice_daily', label: 'Twice daily' },
-  { value: 'thrice_daily', label: 'Three times a day' },
-  { value: 'four_times', label: 'Four times a day' },
+  { value: 'once-daily', label: 'Once daily' },
+  { value: 'twice-daily', label: 'Twice daily' },
+  { value: 'thrice-daily', label: 'Three times a day' },
+  { value: 'four-times-daily', label: 'Four times a day' },
   { value: 'weekly', label: 'Weekly' },
-  { value: 'as_needed', label: 'As needed' },
+  { value: 'as-needed', label: 'As needed' },
+  { value: 'custom', label: 'Custom' },
 ]
 
 export const QUEUE_STATUS = {
