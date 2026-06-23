@@ -7,6 +7,7 @@ const createLimiter = (windowMinutes, max, message) =>
     message: { success: false, message },
     standardHeaders: true,
     legacyHeaders: false,
+    validate: { xForwardedForHeader: false },
   });
 
 const globalLimiter = createLimiter(15, 200, "Too many requests. Please slow down.");

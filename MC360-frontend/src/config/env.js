@@ -1,5 +1,5 @@
 export const config = {
-  apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1',
   socketUrl: import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000',
   googleClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
 }

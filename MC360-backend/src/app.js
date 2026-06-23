@@ -13,6 +13,11 @@ const env = require("./config/env");
 
 const app = express();
 
+// ── Trust proxy (required for Render/Heroku/etc behind load balancers) ────────
+// Without this, express-rate-limit throws ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
+// and aborts requests before they reach the route handler.
+app.set('trust proxy', 1);
+
 // ── Security ─────────────────────────────────────────────────────────────────
 app.use(helmet());
 app.use(mongoSanitize());

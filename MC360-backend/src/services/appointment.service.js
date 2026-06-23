@@ -46,26 +46,30 @@ const bookAppointment = async ({
     status: "confirmed",
   });
 
-  // Notifications
+  // Fire-and-forget notifications — do NOT await, they must never block the HTTP response.
+  // On cloud deployments, email/whatsapp services can hang indefinitely with no timeout.
+  createNotification({
+    userId: patientUserId,
+    title: "Appointment Confirmed",
+    message: `Your appointment with Dr. ${doctor.user.name} on ${new Date(date).toLocaleDateString()} at ${timeSlot} is confirmed.`,
+    type: "appointment",
+    data: { appointmentId: appointment._id },
+  }).catch(err => logger.warn(`createNotification failed: ${err.message}`));
+
+  sendAppointmentConfirmation(patient.user, appointment)
+    .catch(err => logger.warn(`sendAppointmentConfirmation failed: ${err.message}`));
+
+  // Populate and return — fall back to unpopulated if populate fails
   try {
-    await createNotification({
-      userId: patientUserId,
-      title: "Appointment Confirmed",
-      message: `Your appointment with Dr. ${doctor.user.name} on ${new Date(date).toLocaleDateString()} at ${timeSlot} is confirmed.`,
-      type: "appointment",
-      data: { appointmentId: appointment._id },
-    });
-
-    await sendAppointmentConfirmation(patient.user, appointment);
+    return await appointment.populate([
+      { path: "doctor", populate: { path: "user", select: "name email phone avatar" } },
+      { path: "patient", populate: { path: "user", select: "name email phone" } },
+      { path: "hospital", select: "name address phone" },
+    ]);
   } catch (err) {
-    logger.warn(`Post-booking notifications failed: ${err.message}`);
+    logger.warn(`Appointment populate failed: ${err.message}`);
+    return appointment;
   }
-
-  return appointment.populate([
-    { path: "doctor", populate: { path: "user", select: "name email phone avatar" } },
-    { path: "patient", populate: { path: "user", select: "name email phone" } },
-    { path: "hospital", select: "name address phone" },
-  ]);
 };
 
 const cancelAppointment = async (appointmentId, userId, reason) => {

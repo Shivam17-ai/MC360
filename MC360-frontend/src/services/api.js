@@ -10,7 +10,7 @@ const api = axios.create({
 
 api.interceptors.request.use((req) => {
   const token = storage.get('token')
-  console.log("🚀 Token being sent to backend:", token);
+//   console.log("🚀 Token being sent to backend:", token);
   if (token) req.headers.Authorization = `Bearer ${token}`
   return req
 })
