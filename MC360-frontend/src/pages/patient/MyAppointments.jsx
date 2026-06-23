@@ -100,7 +100,7 @@ export default function MyAppointments() {
           </div>
         ) : (
           appointments.map(appt => (
-            <div key={appt._id} className="card p-5">
+            <div key={appt._id} className={`card p-5 transition-all duration-200 ${appt.isFollowUp ? 'bg-emerald-50/70 border-2 border-emerald-200 shadow-sm' : ''}`}>
               <div className="flex items-start gap-4">
                 <Avatar name={appt.doctor?.user?.name} src={appt.doctor?.user?.avatar} size="md" />
                 <div className="flex-1 min-w-0">
@@ -109,9 +109,16 @@ export default function MyAppointments() {
                       <h3 className="font-semibold text-slate-900">{appt.doctor?.user?.name || 'Doctor'}</h3>
                       <p className="text-sm text-slate-500">{appt.doctor?.specialization}</p>
                     </div>
-                    <Badge variant={appt.status === 'confirmed' ? 'green' : appt.status === 'completed' ? 'blue' : appt.status === 'cancelled' ? 'red' : 'yellow'}>
-                      {appt.status === 'confirmed' ? 'upcoming' : appt.status}
-                    </Badge>
+                    <div className="flex flex-col items-end gap-1">
+                      <Badge variant={appt.status === 'confirmed' ? 'green' : appt.status === 'completed' ? 'blue' : appt.status === 'cancelled' ? 'red' : 'yellow'}>
+                        {appt.status === 'confirmed' ? 'upcoming' : appt.status}
+                      </Badge>
+                      {appt.isFollowUp && (
+                        <Badge variant="green" className="text-[10px] py-0.5">
+                          Follow-up
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   <div className="flex flex-wrap gap-4 mt-2 text-xs text-slate-500">
                     <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{formatDate(appt.date)}</span>

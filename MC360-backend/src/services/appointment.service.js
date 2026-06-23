@@ -206,4 +206,67 @@ const getDoctorAvailability = async (doctorId, date) => {
   return { available: true, day: dayName, slots };
 };
 
-module.exports = { bookAppointment, cancelAppointment, rescheduleAppointment, getDoctorAvailability, generateSlots };
+const bookFollowUpAppointment = async (originalAppointmentId, doctorUserId, { followUpDate, timeSlot }) => {
+  const doctor = await Doctor.findOne({ user: doctorUserId }).populate('user');
+  if (!doctor) throw Object.assign(new Error('Doctor not found.'), { statusCode: 404 });
+
+  const original = await Appointment.findById(originalAppointmentId)
+    .populate({ path: 'patient', populate: { path: 'user', select: 'name email phone' } });
+  if (!original) throw Object.assign(new Error('Appointment not found.'), { statusCode: 404 });
+
+  if (!original.doctor.equals(doctor._id))
+    throw Object.assign(new Error('Not authorized.'), { statusCode: 403 });
+
+  // Build UTC start/end of the follow-up date
+  const [year, month, day] = followUpDate.split('-').map(Number);
+  const startOfDay = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+  const endOfDay   = new Date(Date.UTC(year, month - 1, day, 23, 59, 59));
+
+  // Check slot isn't already taken
+  const conflict = await Appointment.findOne({
+    doctor: doctor._id,
+    date: { $gte: startOfDay, $lte: endOfDay },
+    timeSlot,
+    status: { $nin: ['cancelled', 'rescheduled'] },
+  });
+  if (conflict) throw Object.assign(new Error('This time slot is already booked.'), { statusCode: 409 });
+
+  // Mark original appointment completed + revisit
+  await Appointment.findByIdAndUpdate(originalAppointmentId, {
+    status: 'completed',
+    followUpRequired: true,
+    followUpDate: startOfDay,
+  });
+
+  // Create the follow-up appointment (auto-confirmed, blocks the slot)
+  const followUp = await Appointment.create({
+    patient:             original.patient._id,
+    doctor:              doctor._id,
+    hospital:            original.hospital,
+    date:                startOfDay,
+    timeSlot,
+    type:                original.type,
+    reason:              `Follow-up: ${original.reason || 'consultation'}`,
+    status:              'confirmed',
+    fee:                 original.fee,
+    isFollowUp:          true,
+    originalAppointment: original._id,
+  });
+
+  // Notify the patient (fire-and-forget)
+  createNotification({
+    userId: original.patient.user._id,
+    title:   'Follow-up Appointment Scheduled',
+    message: `Dr. ${doctor.user.name} has scheduled a follow-up on ${new Date(startOfDay).toLocaleDateString()} at ${timeSlot}.`,
+    type:    'appointment',
+    data:    { appointmentId: followUp._id },
+  }).catch(err => logger.warn(`createNotification failed: ${err.message}`));
+
+  return await followUp.populate([
+    { path: 'doctor',   populate: { path: 'user', select: 'name email phone avatar' } },
+    { path: 'patient',  populate: { path: 'user', select: 'name email phone' } },
+    { path: 'hospital', select: 'name address phone' },
+  ]);
+};
+
+module.exports = { bookAppointment, cancelAppointment, rescheduleAppointment, getDoctorAvailability, generateSlots, bookFollowUpAppointment };

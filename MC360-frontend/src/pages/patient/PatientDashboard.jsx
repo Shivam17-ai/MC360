@@ -93,15 +93,22 @@ export default function PatientDashboard() {
           ) : (
             <div className="space-y-3">
               {upcoming.map((appt) => (
-                <div key={appt._id} className="flex items-center gap-3 p-3 rounded-xl bg-surface-50">
-                  <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center shrink-0">
-                    <Clock className="w-4 h-4 text-primary-600" />
+                <div key={appt._id} className={`flex items-center gap-3 p-3 rounded-xl transition-all border ${appt.isFollowUp ? 'bg-emerald-50 border-emerald-200 text-emerald-950 shadow-sm' : 'bg-surface-50 border-transparent'}`}>
+                  <div className={`w-10 h-10 ${appt.isFollowUp ? 'bg-emerald-100' : 'bg-primary-100'} rounded-xl flex items-center justify-center shrink-0`}>
+                    <Clock className={`w-4 h-4 ${appt.isFollowUp ? 'text-emerald-600' : 'text-primary-600'}`} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-slate-900 truncate">{appt.doctor?.user?.name || appt.doctor?.name || 'Doctor'}</p>
                     <p className="text-xs text-slate-400">{smartDate(appt.date)} · {appt.timeSlot}</p>
                   </div>
-                  <Badge variant={appt.status === 'confirmed' ? 'green' : 'yellow'}>{appt.status}</Badge>
+                  <div className="flex flex-col items-end gap-1">
+                    <Badge variant={appt.status === 'confirmed' ? 'green' : 'yellow'}>{appt.status}</Badge>
+                    {appt.isFollowUp && (
+                      <Badge variant="green" className="text-[10px] py-0.5">
+                        Follow-up
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

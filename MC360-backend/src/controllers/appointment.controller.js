@@ -116,4 +116,16 @@ const rateAppointment = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { bookAppointment, getMyAppointments, getAppointmentById, cancelAppointment, rescheduleAppointment, updateAppointmentStatus, getDoctorAvailability, rateAppointment };
+const bookFollowUp = async (req, res, next) => {
+  try {
+    const { followUpDate, timeSlot } = req.body;
+    if (!followUpDate || !timeSlot)
+      return errorResponse(res, 'followUpDate and timeSlot are required.', 400);
+    const followUp = await appointmentService.bookFollowUpAppointment(
+      req.params.id, req.user._id, { followUpDate, timeSlot }
+    );
+    return successResponse(res, { followUp }, 'Follow-up appointment booked.', 201);
+  } catch (err) { next(err); }
+};
+
+module.exports = { bookAppointment, getMyAppointments, getAppointmentById, cancelAppointment, rescheduleAppointment, updateAppointmentStatus, getDoctorAvailability, rateAppointment, bookFollowUp };

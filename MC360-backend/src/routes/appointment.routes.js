@@ -13,6 +13,7 @@ router.get("/:id", appointmentController.getAppointmentById);
 router.post("/:id/cancel", appointmentController.cancelAppointment);
 router.put("/:id/reschedule", appointmentController.rescheduleAppointment);
 router.put("/:id/status", authorize("doctor", "hospital", "admin"), appointmentController.updateAppointmentStatus);
+router.post("/:id/book-followup", authorize("doctor"), appointmentController.bookFollowUp);
 router.post("/:id/rate", authorize("patient"), appointmentController.rateAppointment);
 
 module.exports = router;

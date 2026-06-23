@@ -4,7 +4,7 @@ import { appointmentService } from '../../services/appointmentService'
 import api from '../../services/api'
 import {
   Calendar, Video, User, CheckCircle, RefreshCcw, XCircle,
-  Upload, FileText, Loader2, Search, X as XIcon,
+  Upload, FileText, Loader2, Search, X as XIcon, Clock,
 } from 'lucide-react'
 import Avatar from '../../components/common/Avatar'
 import Badge from '../../components/common/Badge'
@@ -37,7 +37,7 @@ const matchesPatientId = (appt, q) => {
 }
 
 /* ─── modal default states ─── */
-const CLOSE_REVISIT = { open: false, appt: null, days: '7' }
+const CLOSE_REVISIT = { open: false, appt: null, date: '', slot: '' }
 const CLOSE_REPORT  = { open: false, appt: null, title: '', type: 'other', file: null, uploading: false }
 
 const TABS = ['today', 'upcoming', 'completed', 'revisit', 'cancelled']
@@ -163,17 +163,46 @@ export default function DoctorAppointments() {
     if (reason !== null) cancelMutation.mutate({ id, reason })
   }
 
+  /* ── follow-up slot query ── */
+  const followUpDoctorId = revisitModal.appt?.doctor?._id
+  const followUpDate     = revisitModal.date
+
+  const slotsQ = useQuery({
+    queryKey: ['followup-slots', followUpDoctorId, followUpDate],
+    queryFn: () =>
+      appointmentService.getSlots(followUpDoctorId, followUpDate)
+        .then(r => r.data?.availability?.slots || []),
+    enabled: !!followUpDoctorId && !!followUpDate,
+  })
+
+  const followUpSlots = slotsQ.data || []
+
+  /* ── follow-up booking mutation ── */
+  const followUpMutation = useMutation({
+    mutationFn: ({ id, data }) => appointmentService.bookFollowUp(id, data),
+    onSuccess: () => {
+      invalidateAll()
+      toast.success('Follow-up appointment booked!')
+      setRevisitModal(CLOSE_REVISIT)
+    },
+    onError: (e) => toast.error(e?.response?.data?.message || 'Booking failed'),
+  })
+
   const submitRevisit = () => {
-    const days = parseInt(revisitModal.days, 10)
-    if (!days || days < 1) return toast.error('Enter a valid number of days')
-    const followUpDate = new Date()
-    followUpDate.setDate(followUpDate.getDate() + days)
-    updateMutation.mutate({
+    if (!revisitModal.date) return toast.error('Please select a date')
+    if (!revisitModal.slot) return toast.error('Please select a time slot')
+    followUpMutation.mutate({
       id: revisitModal.appt._id,
-      data: { status: 'completed', followUpRequired: true, followUpDate: followUpDate.toISOString() },
+      data: { followUpDate: revisitModal.date, timeSlot: revisitModal.slot },
     })
-    setRevisitModal(CLOSE_REVISIT)
   }
+
+  /* ── min date for the date picker (tomorrow) ── */
+  const minDate = (() => {
+    const d = new Date()
+    d.setDate(d.getDate() + 1)
+    return d.toISOString().split('T')[0]
+  })()
 
   const submitReport = async () => {
     if (!reportModal.file)         return toast.error('Please select a file')
@@ -195,13 +224,7 @@ export default function DoctorAppointments() {
     }
   }
 
-  const previewFollowUp = () => {
-    const d = parseInt(revisitModal.days, 10)
-    if (!d || d < 1) return null
-    return new Date(Date.now() + d * 86_400_000).toLocaleDateString('en-IN', {
-      day: 'numeric', month: 'short', year: 'numeric',
-    })
-  }
+
 
   /* ──────────── render ──────────── */
   return (
@@ -294,7 +317,7 @@ export default function DoctorAppointments() {
                 </tr>
               ) : (
                 activeData.map(appt => (
-                  <tr key={appt._id} className="hover:bg-surface-50 transition-colors">
+                  <tr key={appt._id} className={`transition-colors ${appt.isFollowUp ? 'bg-emerald-50/50 hover:bg-emerald-100/50 font-medium' : 'hover:bg-surface-50'}`}>
 
                     {/* Patient */}
                     <td className="px-4 py-3">
@@ -337,6 +360,11 @@ export default function DoctorAppointments() {
                         }>
                           {appt.status}
                         </Badge>
+                        {appt.isFollowUp && (
+                          <Badge variant="green" className="text-[10px] py-0">
+                            Follow-up
+                          </Badge>
+                        )}
                         {appt.followUpRequired && (
                           <Badge variant="yellow" className="text-[10px] py-0">
                             Revisit{appt.followUpDate
@@ -366,7 +394,7 @@ export default function DoctorAppointments() {
                             </button>
 
                             <button
-                              onClick={() => setRevisitModal({ open: true, appt, days: '7' })}
+                              onClick={() => setRevisitModal({ open: true, appt, date: '', slot: '' })}
                               disabled={updateMutation.isPending}
                               title="Schedule Revisit"
                               className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg
@@ -415,11 +443,12 @@ export default function DoctorAppointments() {
       {/* ══════════════ Revisit Modal ══════════════ */}
       <Modal
         isOpen={revisitModal.open}
-        onClose={() => setRevisitModal(CLOSE_REVISIT)}
-        title="Schedule Patient Revisit"
-        size="sm"
+        onClose={() => !followUpMutation.isPending && setRevisitModal(CLOSE_REVISIT)}
+        title="Schedule Follow-up Appointment"
+        size="md"
       >
         <div className="space-y-5">
+          {/* Patient info */}
           <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-xl border border-amber-100">
             <Avatar name={revisitModal.appt?.patient?.user?.name} size="sm" />
             <div>
@@ -430,42 +459,82 @@ export default function DoctorAppointments() {
             </div>
           </div>
 
+          {/* Date picker */}
           <div>
             <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1.5">
-              Follow-up after how many days?
+              <Calendar className="w-3.5 h-3.5 inline mr-1" />Follow-up Date *
             </label>
             <input
-              type="number"
-              min={1}
-              max={365}
-              value={revisitModal.days}
-              onChange={e => setRevisitModal(p => ({ ...p, days: e.target.value }))}
-              className="input-base text-lg font-bold text-center"
-              placeholder="e.g. 7"
+              type="date"
+              min={minDate}
+              value={revisitModal.date}
+              onChange={e => setRevisitModal(p => ({ ...p, date: e.target.value, slot: '' }))}
+              className="input-base"
             />
-            {previewFollowUp() && (
-              <p className="text-xs text-slate-400 mt-2 text-center">
-                📅 Revisit date:{' '}
-                <span className="font-semibold text-slate-700">{previewFollowUp()}</span>
-              </p>
-            )}
           </div>
+
+          {/* Time slot grid */}
+          {revisitModal.date && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">
+                <Clock className="w-3.5 h-3.5 inline mr-1" />Available Time Slots *
+              </label>
+              {slotsQ.isLoading ? (
+                <div className="flex gap-2 flex-wrap">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="skeleton h-9 w-28 rounded-lg" />
+                  ))}
+                </div>
+              ) : followUpSlots.length === 0 ? (
+                <p className="text-sm text-slate-400 py-4 text-center">No slots available for this date</p>
+              ) : (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1">
+                  {followUpSlots.map(slot => {
+                    const label = `${slot.startTime} - ${slot.endTime}`
+                    const isSelected = revisitModal.slot === label
+                    return (
+                      <button
+                        key={label}
+                        disabled={slot.isBooked}
+                        onClick={() => setRevisitModal(p => ({ ...p, slot: label }))}
+                        className={`px-2 py-2 rounded-lg text-xs font-medium border transition-all
+                          ${ slot.isBooked
+                            ? 'bg-surface-50 text-slate-300 border-surface-100 cursor-not-allowed line-through'
+                            : isSelected
+                              ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                              : 'bg-white text-slate-700 border-surface-200 hover:border-amber-300 hover:bg-amber-50'
+                          }`}
+                      >
+                        {slot.startTime}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+              {revisitModal.slot && (
+                <p className="text-xs text-amber-600 font-medium mt-2">
+                  Selected: {revisitModal.slot}
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-1 border-t border-surface-100">
             <button
               onClick={() => setRevisitModal(CLOSE_REVISIT)}
+              disabled={followUpMutation.isPending}
               className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-surface-100 rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={submitRevisit}
-              disabled={updateMutation.isPending}
+              disabled={followUpMutation.isPending || !revisitModal.date || !revisitModal.slot}
               className="px-4 py-2 text-sm font-semibold text-white bg-amber-500 hover:bg-amber-600
                 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
             >
-              {updateMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-              Confirm Revisit
+              {followUpMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              Book Follow-up
             </button>
           </div>
         </div>

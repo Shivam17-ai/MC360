@@ -26,6 +26,8 @@ const appointmentSchema = new mongoose.Schema(
     followUpDate: { type: Date },
     cancelReason: { type: String },
     cancelledBy: { type: String, enum: ["patient", "doctor", "system"] },
+    isFollowUp: { type: Boolean, default: false },
+    originalAppointment: { type: mongoose.Schema.Types.ObjectId, ref: "Appointment" },
     fee: { type: Number, default: 0 },
     isPaid: { type: Boolean, default: false },
     paymentId: { type: String },

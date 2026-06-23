@@ -96,11 +96,14 @@ export default function DoctorDashboard() {
           ) : (
             <div className="space-y-2">
               {appointments.map(appt => (
-                <div key={appt._id} className="flex items-center gap-4 p-3 rounded-xl hover:bg-surface-50 transition-colors border border-transparent hover:border-surface-100">
+                <div key={appt._id} className={`flex items-center gap-4 p-3 rounded-xl transition-all border ${appt.isFollowUp ? 'bg-emerald-50 border-emerald-100 hover:bg-emerald-100/50 hover:border-emerald-200 shadow-sm' : 'hover:bg-surface-50 border-transparent hover:border-surface-100'}`}>
                   <span className="text-[11px] font-bold text-slate-500 w-16 shrink-0">{appt.timeSlot.split(' - ')[0]}</span>
                   <Avatar name={appt.patient?.user?.name} size="sm" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-900 truncate">{appt.patient?.user?.name || '—'}</p>
+                    <p className="text-sm font-semibold text-slate-900 truncate flex items-center gap-1.5">
+                      {appt.patient?.user?.name || '—'}
+                      {appt.isFollowUp && <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold uppercase tracking-wider">Follow-up</span>}
+                    </p>
                     <p className="text-[10px] text-slate-400 truncate">{appt.reason}</p>
                   </div>
                 </div>
@@ -125,14 +128,17 @@ export default function DoctorDashboard() {
           ) : (
             <div className="space-y-2">
               {upcoming.map(appt => (
-                <div key={appt._id} className="flex items-center gap-4 p-3 rounded-xl hover:bg-surface-50 transition-colors border border-transparent hover:border-surface-100">
+                <div key={appt._id} className={`flex items-center gap-4 p-3 rounded-xl transition-all border ${appt.isFollowUp ? 'bg-emerald-50 border-emerald-100 hover:bg-emerald-100/50 hover:border-emerald-200 shadow-sm' : 'hover:bg-surface-50 border-transparent hover:border-surface-100'}`}>
                   <div className="w-16 shrink-0 text-center">
                     <p className="text-[10px] font-bold text-primary-600 uppercase">{new Date(appt.date).toLocaleDateString('en-US', { month: 'short' })}</p>
                     <p className="text-lg font-bold text-slate-900 leading-none">{new Date(appt.date).getDate()}</p>
                   </div>
                   <Avatar name={appt.patient?.user?.name} size="sm" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-900 truncate">{appt.patient?.user?.name || '—'}</p>
+                    <p className="text-sm font-semibold text-slate-900 truncate flex items-center gap-1.5">
+                      {appt.patient?.user?.name || '—'}
+                      {appt.isFollowUp && <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold uppercase tracking-wider">Follow-up</span>}
+                    </p>
                     <p className="text-[10px] text-slate-400 truncate">{appt.timeSlot} • {appt.type}</p>
                   </div>
                   <ArrowRight className="w-4 h-4 text-slate-300" />
