@@ -2,6 +2,64 @@ const DietPlan = require("../models/DietPlan.model");
 const Patient = require("../models/Patient.model");
 const { generateDietPlan } = require("./ai.service");
 
+const parseNumber = (val, defaultVal = 0) => {
+  if (val === null || val === undefined) return defaultVal;
+  if (typeof val === 'number') return isNaN(val) ? defaultVal : val;
+  if (typeof val === 'string') {
+    const cleaned = val.replace(/[^\d\.]/g, '');
+    const parsed = parseFloat(cleaned);
+    return isNaN(parsed) ? defaultVal : parsed;
+  }
+  return defaultVal;
+};
+
+const normalizePlan = (plan, patientData) => {
+  const normalized = {};
+
+  normalized.title = plan.title || `${patientData.goal} Diet Plan`;
+  normalized.totalCalories = parseNumber(plan.totalCalories || plan.totalCaloriesDaily || patientData.targetCalories || 2000);
+  
+  // Normalize macros
+  const rawMacros = plan.macros || {};
+  normalized.macros = {
+    protein: parseNumber(rawMacros.protein, 60),
+    carbs: parseNumber(rawMacros.carbs, 250),
+    fat: parseNumber(rawMacros.fat, 50),
+    fiber: parseNumber(rawMacros.fiber, 30),
+  };
+
+  // Normalize days
+  const rawDays = Array.isArray(plan.days) ? plan.days : [];
+  normalized.days = [];
+
+  for (let i = 0; i < 7; i++) {
+    const rawDay = rawDays[i] || {};
+    const normalizedDay = {
+      totalCalories: parseNumber(rawDay.totalCalories, normalized.totalCalories),
+      breakfast: { name: "Healthy Breakfast", description: "Healthy Indian breakfast options", calories: 400 },
+      lunch: { name: "Healthy Lunch", description: "Balanced Indian lunch with Dal, Sabzi & Roti", calories: 600 },
+      snack: { name: "Healthy Evening Snack", description: "Roasted chana or green tea with nuts", calories: 200 },
+      dinner: { name: "Healthy Dinner", description: "Light Indian dinner options", calories: 500 },
+    };
+
+    const mealKeys = ['breakfast', 'lunch', 'snack', 'dinner'];
+    mealKeys.forEach(key => {
+      if (rawDay[key]) {
+        normalizedDay[key] = {
+          name: rawDay[key].name || normalizedDay[key].name,
+          description: rawDay[key].description || normalizedDay[key].description,
+          calories: parseNumber(rawDay[key].calories, normalizedDay[key].calories),
+        };
+      }
+    });
+
+    normalized.days.push(normalizedDay);
+  }
+
+  normalized.notes = plan.notes || "";
+  return normalized;
+};
+
 const createDietPlan = async (patientId, options = {}) => {
   const patient = await Patient.findById(patientId);
   if (!patient) throw Object.assign(new Error("Patient not found."), { statusCode: 404 });
@@ -19,7 +77,8 @@ const createDietPlan = async (patientId, options = {}) => {
     targetCalories: options.targetCalories || 2000,
   };
 
-  const plan = await generateDietPlan(patientData);
+  const rawPlan = await generateDietPlan(patientData);
+  const plan = normalizePlan(rawPlan, patientData);
 
   // Deactivate previous plans
   await DietPlan.updateMany({ patient: patientId, isActive: true }, { isActive: false });
@@ -28,11 +87,11 @@ const createDietPlan = async (patientId, options = {}) => {
     patient: patientId,
     generatedBy: "ai",
     doctor: options.doctorId,
-    title: plan.title || `${patientData.goal} Diet Plan`,
+    title: plan.title,
     goal: patientData.goal,
     duration: options.duration || 7,
     totalCalories: plan.totalCalories,
-    dailyCalorieTarget: plan.dailyCalorieTarget || plan.totalCalories,
+    dailyCalorieTarget: plan.totalCalories,
     macros: plan.macros,
     restrictions: patientData.restrictions,
     days: plan.days,

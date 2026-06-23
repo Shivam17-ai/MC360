@@ -24,7 +24,11 @@ export const useAuthStore = create((set, get) => ({
         storage.set('user', fresh.data)
       } catch (err) {
         console.error("Auth check failed:", err)
-        get().logout()
+        if (err.status === 401) {
+          get().logout()
+        } else {
+          set({ isInitialized: true })
+        }
       }
     } else {
       set({ isAuthenticated: false, isInitialized: true })

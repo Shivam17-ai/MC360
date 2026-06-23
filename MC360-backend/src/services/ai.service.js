@@ -20,34 +20,47 @@ const callGroq = async (messages, options = {}) => {
     );
   }
 
-  try {
-    const response = await axios.post(
-      GROQ_API_URL,
-      {
-        model: options.model || DEFAULT_MODEL,
-        messages: Array.isArray(messages) ? messages : [{ role: "user", content: messages }],
-        temperature: options.temperature ?? 0.3,
-        max_tokens: options.maxTokens || 2048,
-        response_format: options.json ? { type: "json_object" } : undefined,
-      },
-      {
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        timeout: 30000,
-      }
-    );
+  const maxRetries = options.retries ?? 3;
+  let delayMs = options.initialDelay ?? 1000;
 
-    const content = response.data?.choices?.[0]?.message?.content;
-    if (!content) throw new Error("Empty response from Groq");
-    return content;
-  } catch (err) {
-    if (err.response?.status === 429) {
-      throw Object.assign(new Error("Rate limit reached. Please try again later."), { statusCode: 429 });
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await axios.post(
+        GROQ_API_URL,
+        {
+          model: options.model || DEFAULT_MODEL,
+          messages: Array.isArray(messages) ? messages : [{ role: "user", content: messages }],
+          temperature: options.temperature ?? 0.3,
+          max_tokens: options.maxTokens || 2048,
+          response_format: options.json ? { type: "json_object" } : undefined,
+        },
+        {
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          timeout: 30000,
+        }
+      );
+
+      const content = response.data?.choices?.[0]?.message?.content;
+      if (!content) throw new Error("Empty response from Groq");
+      return content;
+    } catch (err) {
+      const isRateLimit = err.response?.status === 429;
+      
+      if (attempt === maxRetries) {
+        if (isRateLimit) {
+          throw Object.assign(new Error("Rate limit reached. Please try again later."), { statusCode: 429 });
+        }
+        logger.error(`Groq API error: ${err.response?.data?.error?.message || err.message}`);
+        throw Object.assign(new Error("AI service temporarily unavailable."), { statusCode: 503 });
+      }
+
+      logger.warn(`Groq API error/rate limit (attempt ${attempt}/${maxRetries}): ${err.message}. Retrying in ${delayMs}ms...`);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      delayMs *= 2;
     }
-    logger.error(`Groq API error: ${err.response?.data?.error?.message || err.message}`);
-    throw Object.assign(new Error("AI service temporarily unavailable."), { statusCode: 503 });
   }
 };
 

@@ -22,9 +22,10 @@ api.interceptors.response.use(
     if (err.response?.status === 401) {
       storage.remove('token')
       storage.remove('user')
-      // Removed hard redirect to avoid refresh loops
     }
-    return Promise.reject(new Error(message))
+    const error = new Error(message)
+    error.status = err.response?.status
+    return Promise.reject(error)
   },
 )
 

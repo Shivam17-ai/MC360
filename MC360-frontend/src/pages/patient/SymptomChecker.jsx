@@ -363,11 +363,20 @@ function InteractiveMessage({ content, onSend, onAppend, chatLoading }) {
   const parseContent = (text) => {
     if (!text) return []
 
-    // Normalize inline markers like '* ' or '+ ' or '- ' to newlines if mashed together
-    const normalized = text
-      .replace(/(?:\s+|\n|^)\*(?=\s)/g, '\n*')
-      .replace(/(?:\s+|\n|^)\+(?=\s)/g, '\n+')
-      .replace(/(?:\s+|\n|^)-(?=\s)/g, '\n-')
+    // 1. Pre-process to normalize spacing, inline list items, dividers, and headers
+    let normalized = text
+      // Normalize inline dividers (e.g. ----------------- or ===) to a clean marker
+      .replace(/\s*([-=_]{3,})\s*/g, '\n---\n')
+      // Normalize headers (text wrapped in ** followed by dividers or spaces)
+      .replace(/\*\*([^*]+)\*\*/g, (match, p1) => `\n\n**${p1.trim()}**\n`)
+      // Normalize bullet items
+      .replace(/(?:\s+|^)\*(?=\s)/g, '\n* ')
+      .replace(/(?:\s+|^)\+(?=\s)/g, '\n+ ')
+      .replace(/(?:\s+|^)-(?=\s)/g, '\n- ')
+      // Normalize numbered items (e.g. 1., 2.)
+      .replace(/(?:\s+|^)(\d+\.)(?=\s)/g, '\n$1 ')
+      // Remove excessive newlines
+      .replace(/\n{3,}/g, '\n\n')
 
     const lines = normalized.split('\n')
     const blocks = []
@@ -377,6 +386,21 @@ function InteractiveMessage({ content, onSend, onAppend, chatLoading }) {
       const trimmed = line.trim()
       if (!trimmed) return
 
+      // Handle horizontal divider
+      if (trimmed === '---') {
+        currentChips = null
+        blocks.push({ type: 'divider' })
+        return
+      }
+
+      // Handle header
+      if (trimmed.startsWith('**') && trimmed.endsWith('**')) {
+        currentChips = null
+        blocks.push({ type: 'header', text: trimmed.slice(2, -2) })
+        return
+      }
+
+      // Handle interactive chips
       if (trimmed.startsWith('+')) {
         const value = trimmed.substring(1).trim()
         if (value) {
@@ -386,17 +410,28 @@ function InteractiveMessage({ content, onSend, onAppend, chatLoading }) {
           }
           currentChips.items.push(value)
         }
-      } else {
-        currentChips = null
-        
-        if (trimmed.startsWith('*') || trimmed.startsWith('-')) {
-          const value = trimmed.substring(1).trim()
-          if (value) {
-            blocks.push({ type: 'bullet', text: value })
-          }
-        } else {
-          blocks.push({ type: 'paragraph', text: trimmed })
+        return
+      }
+
+      // If not a chip, break current chips grouping
+      currentChips = null
+
+      // Handle bullet items
+      if (trimmed.startsWith('*') || trimmed.startsWith('-')) {
+        const value = trimmed.substring(1).trim()
+        if (value) {
+          blocks.push({ type: 'bullet', text: value })
         }
+      } 
+      // Handle numbered items
+      else if (/^\d+\./.test(trimmed)) {
+        const numPart = trimmed.match(/^\d+\./)[0]
+        const value = trimmed.substring(numPart.length).trim()
+        blocks.push({ type: 'numbered', num: numPart, text: value })
+      } 
+      // Regular paragraph
+      else {
+        blocks.push({ type: 'paragraph', text: trimmed })
       }
     })
 
@@ -415,10 +450,10 @@ function InteractiveMessage({ content, onSend, onAppend, chatLoading }) {
     const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g)
     return parts.map((part, index) => {
       if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={index} className="font-semibold text-slate-900">{part.slice(2, -2)}</strong>
+        return <strong key={index} className="font-bold text-slate-900">{part.slice(2, -2)}</strong>
       }
       if (part.startsWith('*') && part.endsWith('*')) {
-        return <strong key={index} className="font-semibold text-slate-900">{part.slice(1, -1)}</strong>
+        return <strong key={index} className="font-semibold text-slate-800">{part.slice(1, -1)}</strong>
       }
       return part
     })
@@ -439,17 +474,38 @@ function InteractiveMessage({ content, onSend, onAppend, chatLoading }) {
   return (
     <div className="space-y-3">
       {blocks.map((block, idx) => {
+        if (block.type === 'header') {
+          return (
+            <h4 key={idx} className="text-sm font-extrabold text-slate-900 mt-4 mb-1.5 first:mt-0 uppercase tracking-wider flex items-center gap-1.5">
+              <span className="w-1 h-3.5 bg-primary-600 rounded" />
+              {block.text}
+            </h4>
+          )
+        }
+        if (block.type === 'divider') {
+          return <hr key={idx} className="my-2 border-slate-200" />
+        }
         if (block.type === 'paragraph') {
           return (
-            <p key={idx} className="text-slate-700 leading-relaxed">
+            <p key={idx} className="text-slate-700 leading-relaxed whitespace-pre-wrap mb-1">
               {renderTextWithFormatting(block.text)}
             </p>
           )
         }
         if (block.type === 'bullet') {
           return (
-            <div key={idx} className="flex gap-2.5 items-start pl-1 my-1">
+            <div key={idx} className="flex gap-2.5 items-start pl-1.5 my-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-primary-500 mt-2 shrink-0 animate-pulse" />
+              <p className="text-slate-700 leading-relaxed flex-1">
+                {renderTextWithFormatting(block.text)}
+              </p>
+            </div>
+          )
+        }
+        if (block.type === 'numbered') {
+          return (
+            <div key={idx} className="flex gap-2.5 items-start pl-1.5 my-1.5">
+              <span className="text-xs font-bold text-primary-600 shrink-0 mt-1">{block.num}</span>
               <p className="text-slate-700 leading-relaxed flex-1">
                 {renderTextWithFormatting(block.text)}
               </p>
@@ -458,7 +514,7 @@ function InteractiveMessage({ content, onSend, onAppend, chatLoading }) {
         }
         if (block.type === 'chips') {
           return (
-            <div key={idx} className="flex flex-wrap gap-2 my-3 pl-4">
+            <div key={idx} className="flex flex-wrap gap-2 my-3.5 pl-4">
               {block.items.map((item, itemIdx) => {
                 const isSelected = selected.includes(item)
                 return (
@@ -493,7 +549,7 @@ function InteractiveMessage({ content, onSend, onAppend, chatLoading }) {
       })}
 
       {selected.length > 0 && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-3 pt-3 border-t border-slate-200/80 animate-fade-in">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-3.5 pt-3 border-t border-slate-200/80 animate-fade-in">
           <p className="text-xs text-slate-500 font-medium italic">
             Selected: <span className="text-primary-700 font-bold">{selected.length}</span> {selected.length === 1 ? 'item' : 'items'}
           </p>
