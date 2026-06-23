@@ -25,12 +25,27 @@ app.use(hpp());
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
 app.use(cors({
-  origin: [
-    env.CLIENT_URL,
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "https://mc360.onrender.com",
-  ],
+  origin: (origin, callback) => {
+    const allowedOrigins = [
+      env.CLIENT_URL,
+      "http://localhost:5173",
+      "http://localhost:3000",
+      "https://mc360.onrender.com",
+    ];
+    if (!origin) return callback(null, true);
+    
+    const isAllowed = allowedOrigins.includes(origin) || 
+                      origin.endsWith(".vercel.app") ||
+                      /\.vercel\.app$/.test(origin) ||
+                      /^http:\/\/localhost:\d+$/.test(origin) ||
+                      /^http:\/\/127\.0\.0\.1:\d+$/.test(origin);
+
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      callback(null, false);
+    }
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],

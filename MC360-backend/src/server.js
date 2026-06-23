@@ -71,19 +71,23 @@ const startServer = async () => {
 // Graceful shutdown
 const shutdown = (signal) => {
   logger.info(`${signal} received. Shutting down...`);
-  server.close(() => {
+  server.close(async () => {
     logger.info("HTTP server closed.");
-    require("mongoose").connection.close(false, () => {
+    try {
+      await require("mongoose").connection.close();
       logger.info("MongoDB connection closed.");
       process.exit(0);
-    });
+    } catch (err) {
+      logger.error(`Error closing MongoDB: ${err.message}`);
+      process.exit(1);
+    }
   });
 };
 
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("unhandledRejection", (err) => {
-  logger.error(`Unhandled Rejection: ${err.message}`);
+  logger.error(`Unhandled Rejection: ${err.stack || err.message}`);
   shutdown("unhandledRejection");
 });
 

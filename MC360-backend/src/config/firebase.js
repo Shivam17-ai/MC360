@@ -16,12 +16,20 @@ const initFirebase = () => {
     }
 
     if (!admin.apps || admin.apps.length === 0) {
+      const credential = admin.credential 
+        ? admin.credential.cert({
+            projectId: env.FIREBASE_PROJECT_ID,
+            privateKey: env.FIREBASE_PRIVATE_KEY,
+            clientEmail: env.FIREBASE_CLIENT_EMAIL,
+          })
+        : admin.cert({
+            projectId: env.FIREBASE_PROJECT_ID,
+            privateKey: env.FIREBASE_PRIVATE_KEY,
+            clientEmail: env.FIREBASE_CLIENT_EMAIL,
+          });
+
       firebaseApp = admin.initializeApp({
-        credential: admin.credential.cert({
-          projectId: env.FIREBASE_PROJECT_ID,
-          privateKey: env.FIREBASE_PRIVATE_KEY,
-          clientEmail: env.FIREBASE_CLIENT_EMAIL,
-        }),
+        credential,
       });
       logger.info("Firebase Admin initialized.");
     } else {
