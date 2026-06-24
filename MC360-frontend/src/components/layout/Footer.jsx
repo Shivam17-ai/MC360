@@ -36,7 +36,7 @@ export default function Footer() {
         </div>
         <div className="divider border-slate-800 pt-6 flex flex-col md:flex-row items-center justify-between gap-3">
           <p className="text-xs">© 2025 MC360. All rights reserved.</p>
-          <p className="text-xs">Built with care for better healthcare.</p>
+          <p className="text-xs">Built with 💦💦 by Shubham Chakma, Shivam and Anuradha for better healthcare.</p>
         </div>
       </div>
     </footer>
