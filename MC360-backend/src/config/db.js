@@ -22,4 +22,4 @@ mongoose.connection.on("reconnected", () => {
   logger.info("MongoDB reconnected.");
 });
 
-module.exports = connectDB;
+module.exports = connectDB
