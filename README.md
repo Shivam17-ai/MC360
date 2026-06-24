@@ -8,9 +8,11 @@ MC360 is a full-stack healthcare platform designed to simplify healthcare access
 It provides appointment management, emergency communication, medicine tracking, online consultations, analytics dashboards, and secure authentication.
 
 Built by:
-- **Shubham Chakma**
+- **Anuradha Paswan**
 - **Shivam**
-- **Anuradha**
+- **Shubham Chakma**
+
+
 
 ---
 
