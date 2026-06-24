@@ -1,5 +1,6 @@
 const EmergencyAlert = require("../models/EmergencyAlert.model");
 const Patient = require("../models/Patient.model");
+const Hospital = require("../models/Hospital.model");
 const { createNotification } = require("../services/notification.service");
 const { sendSMS, sendWhatsApp } = require("../services/whatsapp.service");
 const paginate = require("../utils/paginate");
@@ -46,13 +47,29 @@ const getAlerts = async (req, res, next) => {
       const patient = await Patient.findOne({ user: req.user._id });
       filter.patient = patient?._id;
     }
+    if (req.user.role === "hospital") {
+      const hospital = await Hospital.findOne({ user: req.user._id });
+      if (hospital) filter.hospitalNotified = hospital._id;
+    }
     if (req.query.status) filter.status = req.query.status;
     const { data, pagination } = await paginate(EmergencyAlert, filter, {
       page: req.query.page, limit: req.query.limit,
       populate: [{ path: "patient", populate: { path: "user", select: "name phone" } }, { path: "hospitalNotified", select: "name phone" }],
       sort: { createdAt: -1 },
     });
-    return paginatedResponse(res, data, pagination);
+
+    const formatted = data.map(alert => ({
+      _id: alert._id,
+      patientName: alert.patient?.user?.name || "Unknown Patient",
+      type: alert.type,
+      description: alert.message || "Emergency SOS triggered",
+      location: alert.location?.address || "Unknown Location",
+      contactPhone: alert.patient?.user?.phone || "No Phone",
+      createdAt: alert.createdAt,
+      status: alert.status
+    }));
+
+    return paginatedResponse(res, formatted, pagination);
   } catch (err) { next(err); }
 };
 

@@ -11,4 +11,9 @@ router.get("/", emergencyController.getAlerts);
 router.put("/:id/acknowledge", authorize("doctor", "hospital", "admin"), emergencyController.acknowledgeAlert);
 router.put("/:id/resolve", authorize("doctor", "hospital", "admin"), emergencyController.resolveAlert);
 
+// ── Frontend aligned routes ───────────────────────────────────────────────────
+router.get("/alerts", emergencyController.getAlerts);
+router.patch("/alerts/:id/resolve", authorize("doctor", "hospital", "admin"), emergencyController.resolveAlert);
+router.put("/alerts/:id/resolve", authorize("doctor", "hospital", "admin"), emergencyController.resolveAlert);
+
 module.exports = router;

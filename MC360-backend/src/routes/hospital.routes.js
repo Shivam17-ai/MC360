@@ -13,6 +13,14 @@ router.get("/me/stats", authorize("hospital"), hospitalController.getHospitalSta
 router.post("/me/doctors/:doctorId", authorize("hospital"), hospitalController.addDoctor);
 router.delete("/me/doctors/:doctorId", authorize("hospital"), hospitalController.removeDoctor);
 
+// ── Hospital Management Routes (mapped via /hospital) ────────────────────────
+router.get("/doctors", authorize("hospital"), hospitalController.getHospitalDoctors);
+router.post("/doctors", authorize("hospital"), hospitalController.createAndAddDoctor);
+router.delete("/doctors/:id", authorize("hospital"), hospitalController.removeHospitalDoctor);
+
+router.get("/patients", authorize("hospital"), hospitalController.getHospitalPatients);
+router.get("/analytics", authorize("hospital"), hospitalController.getHospitalAnalyticsPage);
+
 router.get("/", hospitalController.getAllHospitals);
 router.get("/:id", hospitalController.getHospitalById);
 

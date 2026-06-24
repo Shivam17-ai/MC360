@@ -5,6 +5,7 @@ router.use("/auth",          require("./auth.routes"));
 router.use("/patients",      require("./patient.routes"));
 router.use("/doctors",       require("./doctor.routes"));
 router.use("/hospitals",     require("./hospital.routes"));
+router.use("/hospital",      require("./hospital.routes"));
 router.use("/appointments",  require("./appointment.routes"));
 router.use("/tests",         require("./test.routes"));
 router.use("/reports",       require("./report.routes"));
