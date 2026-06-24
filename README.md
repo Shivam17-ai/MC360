@@ -1,4 +1,4 @@
-# 🏥 MC360 — Connected Healthcare Platform
+# 🏥 MC360-Connected Healthcare Platform
 
 <p align="center">
   <b>A modern AI-powered healthcare ecosystem connecting Patients, Doctors, and Hospitals through real-time digital healthcare services.</b>
@@ -342,6 +342,6 @@ This project is proprietary. All rights reserved.
 ---
 
 <p align="center">
-  <b>❤️ Developed For Better Healthcare</b><br>
+  <b> Developed For Better Healthcare</b><br>
   MC360 aims to make healthcare more accessible, connected, and efficient through technology.
 </p>
