@@ -19,7 +19,11 @@ const app = express();
 app.set('trust proxy', 1);
 
 // ── Security ─────────────────────────────────────────────────────────────────
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginOpenerPolicy: false,
+  })
+);
 app.use(mongoSanitize());
 app.use(hpp());
 

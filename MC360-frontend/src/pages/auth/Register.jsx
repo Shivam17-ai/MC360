@@ -4,6 +4,7 @@ import RegisterForm from '../../components/auth/RegisterForm'
 import GoogleLoginButton from '../../components/auth/GoogleLoginButton'
 import toast from 'react-hot-toast'
 import { Activity } from 'lucide-react'
+import { useState } from 'react'
 
 const ROLE_REDIRECT = {
   patient: '/patient/dashboard',
@@ -14,6 +15,7 @@ const ROLE_REDIRECT = {
 export default function Register() {
   const { register, isLoading } = useAuthStore()
   const navigate = useNavigate()
+  const [selectedRole, setSelectedRole] = useState('patient')
 
   const handleSubmit = async (data) => {
     try {
@@ -43,14 +45,14 @@ export default function Register() {
             <p className="text-sm text-slate-500 mt-1">Free forever for individual patients</p>
           </div>
 
-          <GoogleLoginButton />
+          <GoogleLoginButton role={selectedRole} fromRegister={true} />
 
           <div className="relative my-5">
             <div className="divider" />
             <span className="absolute left-1/2 -translate-x-1/2 -top-2.5 bg-white px-3 text-xs text-slate-400">or sign up with email</span>
           </div>
 
-          <RegisterForm onSubmit={handleSubmit} isLoading={isLoading} />
+          <RegisterForm onSubmit={handleSubmit} isLoading={isLoading} onRoleChange={setSelectedRole} />
         </div>
 
         <p className="text-center text-sm text-slate-500 mt-5">

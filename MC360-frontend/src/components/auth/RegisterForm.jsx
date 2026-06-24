@@ -5,7 +5,7 @@ import Input from '../common/Input'
 import Button from '../common/Button'
 import { User, Mail, Phone, Lock } from 'lucide-react'
 
-export default function RegisterForm({ onSubmit, isLoading }) {
+export default function RegisterForm({ onSubmit, isLoading, onRoleChange }) {
   const { register, handleSubmit, formState: { errors } } = useForm({
     resolver: zodResolver(registerSchema),
     defaultValues: { role: 'patient' },
@@ -22,7 +22,16 @@ export default function RegisterForm({ onSubmit, isLoading }) {
         <div className="grid grid-cols-3 gap-2">
           {[{ value: 'patient', label: 'Patient' }, { value: 'doctor', label: 'Doctor' }, { value: 'hospital', label: 'Hospital' }].map((opt) => (
             <label key={opt.value} className="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-surface-200 cursor-pointer hover:border-primary-400 has-[:checked]:border-primary-500 has-[:checked]:bg-primary-50 transition-all">
-              <input type="radio" value={opt.value} {...register('role')} className="sr-only" />
+              <input
+                type="radio"
+                value={opt.value}
+                {...register('role')}
+                onChange={(e) => {
+                  register('role').onChange(e)
+                  onRoleChange?.(e.target.value)
+                }}
+                className="sr-only"
+              />
               <span className="text-sm font-medium text-slate-700">{opt.label}</span>
             </label>
           ))}

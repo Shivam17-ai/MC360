@@ -68,10 +68,10 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
-  googleLogin: async (token) => {
+  googleLogin: async (token, role = 'patient', fromRegister = false) => {
     set({ isLoading: true })
     try {
-      const res = await authService.googleLogin(token)
+      const res = await authService.googleLogin(token, role, fromRegister)
       storage.set('token', res.data.accessToken)
       storage.set('user', res.data.user)
       set({ user: res.data.user, token: res.data.accessToken, isAuthenticated: true, isLoading: false, isInitialized: true })

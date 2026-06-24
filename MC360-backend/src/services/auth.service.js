@@ -5,7 +5,7 @@ const Hospital = require("../models/Hospital.model");
 const { generateAccessToken, generateRefreshToken, verifyRefreshToken } = require("../utils/generateToken");
 const { generateOTP, generateResetToken, hashData } = require("../utils/encryption");
 const { sendWelcomeEmail, sendOTPEmail, sendPasswordResetEmail } = require("../utils/sendEmail");
-const { getAdmin } = require("../config/firebase");
+const { getFirebaseAuth } = require("../config/firebase");
 const logger = require("../utils/logger");
 // Helper function to create default availability (Mon-Fri, 9AM-5PM with 30min slots)
 const createDefaultAvailability = () => {
@@ -91,27 +91,78 @@ const loginUser = async ({ email, password }) => {
   return { user, accessToken, refreshToken };
 };
 
-const loginWithFirebase = async (firebaseToken) => {
-  const admin = getAdmin();
-  if (!admin) throw Object.assign(new Error("Firebase not configured."), { statusCode: 500 });
+const loginWithFirebase = async (firebaseToken, role = 'patient', fromRegister = false) => {
+  const firebaseAuth = getFirebaseAuth();
+  if (!firebaseAuth) throw Object.assign(new Error("Firebase not configured."), { statusCode: 500 });
 
-  const decoded = await admin.auth().verifyIdToken(firebaseToken);
+  const decoded = await firebaseAuth.verifyIdToken(firebaseToken);
   let user = await User.findOne({ $or: [{ firebaseUid: decoded.uid }, { email: decoded.email }] });
 
+  const validRoles = ['patient', 'doctor', 'hospital'];
+  const userRole = validRoles.includes(role) ? role : 'patient';
+
   if (!user) {
+    // ── New user: create account + role-specific profile ──────────────────
     user = await User.create({
       name: decoded.name || decoded.email.split("@")[0],
       email: decoded.email,
       firebaseUid: decoded.uid,
       avatar: decoded.picture || "",
       isVerified: true,
-      role: "patient",
+      role: userRole,
     });
-    await Patient.create({ user: user._id });
+
+    if (userRole === 'patient') {
+      await Patient.create({ user: user._id });
+    } else if (userRole === 'doctor') {
+      await Doctor.create({
+        user: user._id,
+        specialization: 'General',
+        availability: createDefaultAvailability(),
+      });
+    } else if (userRole === 'hospital') {
+      await Hospital.create({ user: user._id, name: decoded.name || 'My Hospital' });
+    }
+
     try { await sendWelcomeEmail(user); } catch {}
-  } else if (!user.firebaseUid) {
-    user.firebaseUid = decoded.uid;
-    await user.save({ validateBeforeSave: false });
+
+  } else {
+    // ── Existing user ─────────────────────────────────────────────────────
+    let dirty = false;
+
+    // Always link firebaseUid if missing
+    if (!user.firebaseUid) {
+      user.firebaseUid = decoded.uid;
+      dirty = true;
+    }
+
+    // When called from the Register page, honour the selected role.
+    // This lets a user who accidentally signed up as patient re-register as doctor/hospital.
+    if (fromRegister && userRole !== user.role) {
+      const prevRole = user.role;
+      user.role = userRole;
+      dirty = true;
+
+      // Create the new role-specific profile if it doesn't already exist
+      if (userRole === 'patient') {
+        const exists = await Patient.findOne({ user: user._id });
+        if (!exists) await Patient.create({ user: user._id });
+      } else if (userRole === 'doctor') {
+        const exists = await Doctor.findOne({ user: user._id });
+        if (!exists) await Doctor.create({
+          user: user._id,
+          specialization: 'General',
+          availability: createDefaultAvailability(),
+        });
+      } else if (userRole === 'hospital') {
+        const exists = await Hospital.findOne({ user: user._id });
+        if (!exists) await Hospital.create({ user: user._id, name: decoded.name || 'My Hospital' });
+      }
+
+      logger.info(`Firebase login: updated user ${user.email} role from ${prevRole} → ${userRole}`);
+    }
+
+    if (dirty) await user.save({ validateBeforeSave: false });
   }
 
   const accessToken = generateAccessToken(user._id, user.role);

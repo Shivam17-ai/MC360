@@ -23,9 +23,9 @@ const login = async (req, res, next) => {
 
 const firebaseLogin = async (req, res, next) => {
   try {
-    const { firebaseToken } = req.body;
+    const { firebaseToken, role, fromRegister } = req.body;
     if (!firebaseToken) return errorResponse(res, "Firebase token required.", 400);
-    const result = await authService.loginWithFirebase(firebaseToken);
+    const result = await authService.loginWithFirebase(firebaseToken, role, !!fromRegister);
     return successResponse(res, result, "Login successful");
   } catch (err) {
     next(err);
