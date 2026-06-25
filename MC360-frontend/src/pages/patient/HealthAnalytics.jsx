@@ -93,7 +93,7 @@ export default function HealthAnalytics() {
     return `${m.value} ${m.unit}`
   }
 
-  const chartData = metrics.slice(-14).map(m => ({
+  const chartData = metrics.slice(0, 14).reverse().map(m => ({
     date: formatDate(m.recordedAt, 'dd MMM'),
     value: m.type === 'blood_pressure' ? m.value?.systolic : parseFloat(m.value),
   }))
@@ -125,8 +125,8 @@ export default function HealthAnalytics() {
     setAddModal(false)
   }
 
-  const latest = metrics[metrics.length - 1]
-  const prev   = metrics[metrics.length - 2]
+  const latest = metrics[0]
+  const prev   = metrics[1]
   const latestNum = latest ? (latest.type === 'blood_pressure' ? latest.value?.systolic : parseFloat(latest.value)) : null
   const prevNum   = prev   ? (prev.type   === 'blood_pressure' ? prev.value?.systolic   : parseFloat(prev.value))   : null
   const trend = latestNum !== null && prevNum !== null ? latestNum - prevNum : 0
@@ -232,7 +232,7 @@ export default function HealthAnalytics() {
           <p className="text-sm text-slate-400 text-center py-6">No records yet. Click "Log Vitals" to start!</p>
         ) : (
           <div className="space-y-2">
-            {[...metrics].reverse().slice(0, 10).map(m => (
+            {metrics.slice(0, 10).map(m => (
               <div key={m._id} className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-surface-50 transition-colors">
                 <span className="text-sm font-medium text-slate-900">{displayValue(m)}</span>
                 <span className="text-xs text-slate-400">{formatDate(m.recordedAt, 'dd MMM yyyy, hh:mm a')}</span>

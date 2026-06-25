@@ -1,7 +1,7 @@
 import api from './api'
 
 export const healthMetricsService = {
-  getAll: (type) => api.get('/health-metrics', { params: { type } }),
+  getAll: (type, limit = 50) => api.get('/health-metrics', { params: { type, limit } }),
   add: (data) => api.post('/health-metrics', data),
   addBulk: (data) => api.post('/health-metrics/bulk', data),
   delete: (id) => api.delete(`/health-metrics/${id}`),

@@ -7,7 +7,7 @@ export const useHealthMetrics = (type) => {
 
   const { data, isLoading } = useQuery({
     queryKey: ['health-metrics', type],
-    queryFn: () => healthMetricsService.getAll(type).then((r) => r.data),
+    queryFn: () => healthMetricsService.getAll(type, 50).then((r) => r.data),
   })
 
   const add = useMutation({
